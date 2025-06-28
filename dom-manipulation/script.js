@@ -8,7 +8,21 @@ class QuoteGenerator {
         category: "motivation"
       }
 
-// Global function for Step 3 requirement
+// Step 2: Global filterQuotes function as required
+function filterQuotes() {
+  const categoryFilter = document.getElementById('categoryFilter');
+  if (!categoryFilter) return;
+  
+  const selectedCategory = categoryFilter.value;
+  const generator = window.quoteGeneratorInstance;
+  
+  if (generator) {
+    generator.filterByCategory(selectedCategory);
+    showGlobalNotification(`Filtered by: ${selectedCategory === 'all' ? 'All Categories' : selectedCategory}`, 'info');
+  }
+}
+
+// Enhanced addQuote function with storage integration
 function addQuote() {
   const quoteText = document.getElementById('newQuoteText').value;
   const quoteCategory = document.getElementById('newQuoteCategory').value;
@@ -38,7 +52,7 @@ function addQuote() {
   document.getElementById('newQuoteText').value = '';
   document.getElementById('newQuoteCategory').value = '';
   
-  showGlobalNotification('Quote added successfully!', 'success');
+  showGlobalNotification('Quote added and saved to storage!', 'success');
 }
 
 // Global notification function
@@ -142,9 +156,12 @@ function showGlobalNotification(message, type = 'info') {
   }
   
   init() {
+    this.loadFromStorage();
     this.cacheElements();
     this.bindEvents();
+    this.populateCategories();
     this.populateCategorySelect();
+    this.restoreLastFilter();
     this.showRandomQuote();
     this.updateStats();
   }
@@ -155,6 +172,7 @@ function showGlobalNotification(message, type = 'info') {
       newQuoteBtn: document.getElementById('newQuote'),
       addQuoteBtn: document.getElementById('addQuoteBtn'),
       categorySelect: document.getElementById('categorySelect'),
+      categoryFilter: document.getElementById('categoryFilter'),
       addQuoteForm: document.getElementById('addQuoteForm'),
       quoteStats: document.getElementById('quoteStats')
     };
@@ -164,6 +182,128 @@ function showGlobalNotification(message, type = 'info') {
     this.elements.newQuoteBtn.addEventListener('click', () => this.showRandomQuote());
     this.elements.addQuoteBtn.addEventListener('click', () => this.toggleAddQuoteForm());
     this.elements.categorySelect.addEventListener('change', (e) => this.filterByCategory(e.target.value));
+    
+    // Save filter preference when window closes
+    window.addEventListener('beforeunload', () => this.saveToStorage());
+  }
+  
+  // Step 2: Web Storage Implementation
+  loadFromStorage() {
+    try {
+      // Load quotes from storage or use defaults
+      const savedQuotes = localStorage.getItem(this.STORAGE_KEYS.QUOTES);
+      if (savedQuotes) {
+        this.quotes = JSON.parse(savedQuotes);
+      } else {
+        // Default quotes if none in storage
+        this.quotes = [
+          {
+            text: "The only way to do great work is to love what you do.",
+            author: "Steve Jobs",
+            category: "motivation"
+          },
+          {
+            text: "Innovation distinguishes between a leader and a follower.",
+            author: "Steve Jobs",
+            category: "innovation"
+          },
+          {
+            text: "Life is what happens to you while you're busy making other plans.",
+            author: "John Lennon",
+            category: "life"
+          },
+          {
+            text: "The future belongs to those who believe in the beauty of their dreams.",
+            author: "Eleanor Roosevelt",
+            category: "dreams"
+          },
+          {
+            text: "Success is not final, failure is not fatal: it is the courage to continue that counts.",
+            author: "Winston Churchill",
+            category: "success"
+          },
+          {
+            text: "The only impossible journey is the one you never begin.",
+            author: "Tony Robbins",
+            category: "motivation"
+          },
+          {
+            text: "In the middle of difficulty lies opportunity.",
+            author: "Albert Einstein",
+            category: "opportunity"
+          },
+          {
+            text: "The way to get started is to quit talking and begin doing.",
+            author: "Walt Disney",
+            category: "action"
+          }
+        ];
+        this.saveToStorage();
+      }
+      
+      // Load last selected filter
+      const lastFilter = localStorage.getItem(this.STORAGE_KEYS.LAST_FILTER);
+      this.lastSelectedFilter = lastFilter || 'all';
+      
+      // Initialize filtered quotes
+      this.filteredQuotes = [...this.quotes];
+      
+    } catch (error) {
+      console.error('Error loading from storage:', error);
+      this.showNotification('Error loading saved data. Using defaults.', 'error');
+    }
+  }
+  
+  saveToStorage() {
+    try {
+      // Save quotes as JSON
+      localStorage.setItem(this.STORAGE_KEYS.QUOTES, JSON.stringify(this.quotes));
+      
+      // Save categories
+      const categories = this.getUniqueCategories();
+      localStorage.setItem(this.STORAGE_KEYS.CATEGORIES, JSON.stringify(categories));
+      
+      // Save last filter
+      const currentFilter = this.elements.categoryFilter ? this.elements.categoryFilter.value : 'all';
+      localStorage.setItem(this.STORAGE_KEYS.LAST_FILTER, currentFilter);
+      
+      // Save user preferences
+      const preferences = {
+        totalQuotes: this.quotes.length,
+        lastUpdated: new Date().toISOString(),
+        version: '1.0'
+      };
+      localStorage.setItem(this.STORAGE_KEYS.USER_PREFERENCES, JSON.stringify(preferences));
+      
+    } catch (error) {
+      console.error('Error saving to storage:', error);
+      this.showNotification('Error saving data to storage.', 'error');
+    }
+  }
+  
+  restoreLastFilter() {
+    if (this.elements.categoryFilter && this.lastSelectedFilter !== 'all') {
+      this.elements.categoryFilter.value = this.lastSelectedFilter;
+      this.elements.categorySelect.value = this.lastSelectedFilter;
+      this.filterByCategory(this.lastSelectedFilter);
+    }
+  }
+  
+  // Step 2: Populate Categories Dynamically
+  populateCategories() {
+    if (!this.elements.categoryFilter) return;
+    
+    // Clear existing options except "All Categories"
+    this.elements.categoryFilter.innerHTML = '<option value="all">All Categories</option>';
+    
+    // Get unique categories and add them
+    const categories = this.getUniqueCategories();
+    categories.forEach(category => {
+      const option = document.createElement('option');
+      option.value = category;
+      option.textContent = category.charAt(0).toUpperCase() + category.slice(1);
+      this.elements.categoryFilter.appendChild(option);
+    });
   }
   
   showRandomQuote() {
@@ -396,6 +536,10 @@ function showGlobalNotification(message, type = 'info') {
     
     // Update category select options
     this.populateCategorySelect();
+    this.populateCategories(); // Update both dropdowns
+    
+    // Save to storage
+    this.saveToStorage();
     
     // Update stats
     this.updateStats();
@@ -436,6 +580,10 @@ function showGlobalNotification(message, type = 'info') {
     
     // Dynamically update category select options
     this.populateCategorySelect();
+    this.populateCategories(); // Update both dropdowns
+    
+    // Save to storage
+    this.saveToStorage();
     
     // Update statistics display
     this.updateStats();
@@ -453,6 +601,18 @@ function showGlobalNotification(message, type = 'info') {
     } else {
       this.filteredQuotes = this.quotes.filter(quote => quote.category === category);
     }
+    
+    // Sync both filter dropdowns
+    if (this.elements.categoryFilter) {
+      this.elements.categoryFilter.value = category;
+    }
+    if (this.elements.categorySelect) {
+      this.elements.categorySelect.value = category;
+    }
+    
+    // Save current filter to storage
+    this.lastSelectedFilter = category;
+    this.saveToStorage();
     
     // Show a random quote from filtered results
     this.showRandomQuote();
@@ -475,7 +635,7 @@ function showGlobalNotification(message, type = 'info') {
     });
     
     // Restore previous selection if it still exists
-    if (currentValue && categories.includes(currentValue)) {
+    if (currentValue && (currentValue === 'all' || categories.includes(currentValue))) {
       this.elements.categorySelect.value = currentValue;
     }
   }

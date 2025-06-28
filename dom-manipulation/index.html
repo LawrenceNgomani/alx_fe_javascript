@@ -27,6 +27,15 @@
         </select>
       </div>
       
+      <!-- Step 1: Category Filter as Required -->
+      <div class="category-filter-section">
+        <label for="categoryFilter">Quick Filter:</label>
+        <select id="categoryFilter" onchange="filterQuotes()">
+          <option value="all">All Categories</option>
+          <!-- Dynamically populated categories -->
+        </select>
+      </div>
+      
       <div id="addQuoteForm" class="form-container hidden"></div>
       
       <!-- Step 3: Direct Quote Addition Form -->
