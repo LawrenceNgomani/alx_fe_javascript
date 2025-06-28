@@ -10,6 +10,11 @@
   <div class="container">
     <header>
       <h1>Dynamic Quote Generator</h1>
+      <div class="sync-status">
+        <span id="syncStatus" class="sync-indicator">●</span>
+        <span id="syncText">Offline</span>
+        <button id="manualSyncBtn" class="btn btn-mini">Sync Now</button>
+      </div>
     </header>
     
     <main>
@@ -45,6 +50,54 @@
           <input id="newQuoteText" type="text" placeholder="Enter a new quote" />
           <input id="newQuoteCategory" type="text" placeholder="Enter quote category" />
           <button onclick="addQuote()">Add Quote</button>
+        </div>
+      </div>
+      
+      <!-- Conflict Resolution Modal -->
+      <div id="conflictModal" class="modal hidden">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h3>Data Conflict Detected</h3>
+            <button id="closeConflictModal" class="close-btn">&times;</button>
+          </div>
+          <div class="modal-body">
+            <p>Server data differs from your local data. How would you like to resolve this?</p>
+            <div class="conflict-options">
+              <button id="useServerData" class="btn btn-primary">Use Server Data</button>
+              <button id="useLocalData" class="btn btn-secondary">Keep Local Data</button>
+              <button id="mergeData" class="btn btn-success">Merge Both</button>
+            </div>
+            <div id="conflictDetails" class="conflict-details"></div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Server Status Panel -->
+      <div class="server-status-panel">
+        <h4>Server Status</h4>
+        <div class="status-grid">
+          <div class="status-item">
+            <span class="status-label">Last Sync:</span>
+            <span id="lastSyncTime">Never</span>
+          </div>
+          <div class="status-item">
+            <span class="status-label">Sync Interval:</span>
+            <span id="syncInterval">30s</span>
+          </div>
+          <div class="status-item">
+            <span class="status-label">Conflicts Resolved:</span>
+            <span id="conflictsResolved">0</span>
+          </div>
+        </div>
+        <div class="sync-controls">
+          <label for="autoSyncToggle">Auto Sync:</label>
+          <input type="checkbox" id="autoSyncToggle" checked>
+          <select id="syncIntervalSelect">
+            <option value="15000">15 seconds</option>
+            <option value="30000" selected>30 seconds</option>
+            <option value="60000">1 minute</option>
+            <option value="300000">5 minutes</option>
+          </select>
         </div>
       </div>
       
