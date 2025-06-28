@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dynamic Quote Generator</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Dynamic Quote Generator</h1>
+    </header>
+    
+    <main>
+      <div id="quoteDisplay" class="quote-container"></div>
+      
+      <div class="controls">
+        <button id="newQuote" class="btn btn-primary">Show New Quote</button>
+        <button id="addQuoteBtn" class="btn btn-secondary">Add New Quote</button>
+      </div>
+      
+      <div class="category-filter">
+        <label for="categorySelect">Filter by Category:</label>
+        <select id="categorySelect">
+          <option value="all">All Categories</option>
+        </select>
+      </div>
+      
+      <div id="addQuoteForm" class="form-container hidden"></div>
+      
+      <!-- Step 3: Direct Quote Addition Form -->
+      <div class="simple-form-container">
+        <h3>Quick Add Quote</h3>
+        <div>
+          <input id="newQuoteText" type="text" placeholder="Enter a new quote" />
+          <input id="newQuoteCategory" type="text" placeholder="Enter quote category" />
+          <button onclick="addQuote()">Add Quote</button>
+        </div>
+      </div>
+      
+      <div class="stats">
+        <div id="quoteStats" class="stats-display"></div>
+      </div>
+    </main>
+  </div>
+  
+  <script src="script.js"></script>
+</body>
+</html>
