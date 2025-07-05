@@ -1,116 +1,22 @@
-// Dynamic Quote Generator - Advanced DOM Manipulation
+// Dynamic Quote Generator - Enhanced with Web Storage and JSON Handling
 class QuoteGenerator {
   constructor() {
-    this.quotes = [
+    // Storage keys for local and session storage
+    this.STORAGE_KEYS = {
+      QUOTES: 'quoteGenerator_quotes',
+      CATEGORIES: 'quoteGenerator_categories',
+      LAST_FILTER: 'quoteGenerator_lastFilter',
+      USER_PREFERENCES: 'quoteGenerator_userPreferences',
+      LAST_VIEWED_QUOTE: 'quoteGenerator_lastViewedQuote' // Session storage
+    };
+    
+    // Default quotes (fallback)
+    this.defaultQuotes = [
       {
         text: "The only way to do great work is to love what you do.",
         author: "Steve Jobs",
         category: "motivation"
-      }
-
-// Step 2: Global filterQuotes function as required
-function filterQuotes() {
-  const categoryFilter = document.getElementById('categoryFilter');
-  if (!categoryFilter) return;
-  
-  const selectedCategory = categoryFilter.value;
-  const generator = window.quoteGeneratorInstance;
-  
-  if (generator) {
-    generator.filterByCategory(selectedCategory);
-    showGlobalNotification(`Filtered by: ${selectedCategory === 'all' ? 'All Categories' : selectedCategory}`, 'info');
-  }
-}
-
-// Enhanced addQuote function with storage integration
-function addQuote() {
-  const quoteText = document.getElementById('newQuoteText').value;
-  const quoteCategory = document.getElementById('newQuoteCategory').value;
-  
-  // Validate inputs
-  if (!quoteText.trim()) {
-    showGlobalNotification('Please enter a quote text.', 'error');
-    return;
-  }
-  
-  if (!quoteCategory.trim()) {
-    showGlobalNotification('Please enter a quote category.', 'error');
-    return;
-  }
-  
-  // Get the QuoteGenerator instance
-  const generator = window.quoteGeneratorInstance;
-  if (!generator) {
-    showGlobalNotification('Quote generator not initialized.', 'error');
-    return;
-  }
-  
-  // Add quote through the instance
-  generator.addQuoteDirectly(quoteText.trim(), quoteCategory.trim());
-  
-  // Clear form inputs
-  document.getElementById('newQuoteText').value = '';
-  document.getElementById('newQuoteCategory').value = '';
-  
-  showGlobalNotification('Quote added and saved to storage!', 'success');
-}
-
-// Global notification function
-function showGlobalNotification(message, type = 'info') {
-  // Remove existing notifications
-  const existingNotifications = document.querySelectorAll('.notification');
-  existingNotifications.forEach(notification => notification.remove());
-  
-  const notification = document.createElement('div');
-  notification.className = `notification notification-${type}`;
-  notification.textContent = message;
-  
-  // Style the notification
-  Object.assign(notification.style, {
-    position: 'fixed',
-    top: '20px',
-    right: '20px',
-    padding: '15px 20px',
-    borderRadius: '8px',
-    color: 'white',
-    fontSize: '14px',
-    fontWeight: '500',
-    zIndex: '10000',
-    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.2)',
-    transform: 'translateX(100%)',
-    transition: 'transform 0.3s ease',
-    maxWidth: '300px'
-  });
-  
-  // Set background color based on type
-  switch (type) {
-    case 'success':
-      notification.style.background = 'linear-gradient(135deg, #11998e 0%, #38ef7d 100%)';
-      break;
-    case 'error':
-      notification.style.background = 'linear-gradient(135deg, #ff6b6b 0%, #ee5a24 100%)';
-      break;
-    default:
-      notification.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
-  }
-  
-  document.body.appendChild(notification);
-  
-  // Animate in
-  setTimeout(() => {
-    notification.style.transform = 'translateX(0)';
-  }, 100);
-  
-  // Animate out and remove
-  setTimeout(() => {
-    notification.style.transform = 'translateX(100%)';
-    setTimeout(() => {
-      if (notification.parentNode) {
-        notification.parentNode.removeChild(notification);
-      }
-    }, 300);
-  }, 3000);
-},
+      },
       {
         text: "Innovation distinguishes between a leader and a follower.",
         author: "Steve Jobs",
@@ -148,9 +54,11 @@ function showGlobalNotification(message, type = 'info') {
       }
     ];
     
+    this.quotes = [...this.defaultQuotes];
     this.currentQuoteIndex = 0;
     this.filteredQuotes = [...this.quotes];
     this.isFormVisible = false;
+    this.lastSelectedFilter = 'all';
     
     this.init();
   }
@@ -164,6 +72,8 @@ function showGlobalNotification(message, type = 'info') {
     this.restoreLastFilter();
     this.showRandomQuote();
     this.updateStats();
+    this.updateStorageStatus();
+    this.loadLastViewedQuote();
   }
   
   cacheElements() {
@@ -174,7 +84,9 @@ function showGlobalNotification(message, type = 'info') {
       categorySelect: document.getElementById('categorySelect'),
       categoryFilter: document.getElementById('categoryFilter'),
       addQuoteForm: document.getElementById('addQuoteForm'),
-      quoteStats: document.getElementById('quoteStats')
+      quoteStats: document.getElementById('quoteStats'),
+      localStorageStatus: document.getElementById('localStorageStatus'),
+      sessionStorageStatus: document.getElementById('sessionStorageStatus')
     };
   }
   
@@ -184,60 +96,23 @@ function showGlobalNotification(message, type = 'info') {
     this.elements.categorySelect.addEventListener('change', (e) => this.filterByCategory(e.target.value));
     
     // Save filter preference when window closes
-    window.addEventListener('beforeunload', () => this.saveToStorage());
+    window.addEventListener('beforeunload', () => {
+      this.saveToStorage();
+      this.saveLastViewedQuote();
+    });
   }
   
-  // Step 2: Web Storage Implementation
+  // Step 1: Web Storage Implementation
   loadFromStorage() {
     try {
-      // Load quotes from storage or use defaults
+      // Load quotes from localStorage
       const savedQuotes = localStorage.getItem(this.STORAGE_KEYS.QUOTES);
       if (savedQuotes) {
         this.quotes = JSON.parse(savedQuotes);
+        this.showNotification('Quotes loaded from storage!', 'success');
       } else {
-        // Default quotes if none in storage
-        this.quotes = [
-          {
-            text: "The only way to do great work is to love what you do.",
-            author: "Steve Jobs",
-            category: "motivation"
-          },
-          {
-            text: "Innovation distinguishes between a leader and a follower.",
-            author: "Steve Jobs",
-            category: "innovation"
-          },
-          {
-            text: "Life is what happens to you while you're busy making other plans.",
-            author: "John Lennon",
-            category: "life"
-          },
-          {
-            text: "The future belongs to those who believe in the beauty of their dreams.",
-            author: "Eleanor Roosevelt",
-            category: "dreams"
-          },
-          {
-            text: "Success is not final, failure is not fatal: it is the courage to continue that counts.",
-            author: "Winston Churchill",
-            category: "success"
-          },
-          {
-            text: "The only impossible journey is the one you never begin.",
-            author: "Tony Robbins",
-            category: "motivation"
-          },
-          {
-            text: "In the middle of difficulty lies opportunity.",
-            author: "Albert Einstein",
-            category: "opportunity"
-          },
-          {
-            text: "The way to get started is to quit talking and begin doing.",
-            author: "Walt Disney",
-            category: "action"
-          }
-        ];
+        // Use defaults and save them
+        this.quotes = [...this.defaultQuotes];
         this.saveToStorage();
       }
       
@@ -251,12 +126,13 @@ function showGlobalNotification(message, type = 'info') {
     } catch (error) {
       console.error('Error loading from storage:', error);
       this.showNotification('Error loading saved data. Using defaults.', 'error');
+      this.quotes = [...this.defaultQuotes];
     }
   }
   
   saveToStorage() {
     try {
-      // Save quotes as JSON
+      // Save quotes to localStorage
       localStorage.setItem(this.STORAGE_KEYS.QUOTES, JSON.stringify(this.quotes));
       
       // Save categories
@@ -275,9 +151,70 @@ function showGlobalNotification(message, type = 'info') {
       };
       localStorage.setItem(this.STORAGE_KEYS.USER_PREFERENCES, JSON.stringify(preferences));
       
+      this.updateStorageStatus();
+      
     } catch (error) {
       console.error('Error saving to storage:', error);
       this.showNotification('Error saving data to storage.', 'error');
+    }
+  }
+  
+  // Session Storage for last viewed quote
+  saveLastViewedQuote() {
+    try {
+      const currentQuote = this.getCurrentDisplayedQuote();
+      if (currentQuote) {
+        sessionStorage.setItem(this.STORAGE_KEYS.LAST_VIEWED_QUOTE, JSON.stringify({
+          quote: currentQuote,
+          timestamp: new Date().toISOString()
+        }));
+      }
+    } catch (error) {
+      console.error('Error saving last viewed quote:', error);
+    }
+  }
+  
+  loadLastViewedQuote() {
+    try {
+      const lastViewedData = sessionStorage.getItem(this.STORAGE_KEYS.LAST_VIEWED_QUOTE);
+      if (lastViewedData) {
+        const { quote, timestamp } = JSON.parse(lastViewedData);
+        this.showNotification(`Restored last viewed quote from ${new Date(timestamp).toLocaleTimeString()}`, 'info');
+        this.displayQuote(quote);
+      }
+    } catch (error) {
+      console.error('Error loading last viewed quote:', error);
+    }
+  }
+  
+  getCurrentDisplayedQuote() {
+    // Extract current quote from display (simplified approach)
+    const quoteText = this.elements.quoteDisplay.querySelector('.quote-text');
+    const quoteAuthor = this.elements.quoteDisplay.querySelector('.quote-author');
+    const quoteCategory = this.elements.quoteDisplay.querySelector('.quote-category');
+    
+    if (quoteText && quoteAuthor && quoteCategory) {
+      return {
+        text: quoteText.textContent.replace(/"/g, ''),
+        author: quoteAuthor.textContent.replace('— ', ''),
+        category: quoteCategory.textContent.toLowerCase()
+      };
+    }
+    return null;
+  }
+  
+  updateStorageStatus() {
+    try {
+      // Update localStorage status
+      const quotesSize = new Blob([localStorage.getItem(this.STORAGE_KEYS.QUOTES) || '']).size;
+      this.elements.localStorageStatus.textContent = `${this.quotes.length} quotes (${(quotesSize / 1024).toFixed(1)} KB)`;
+      
+      // Update sessionStorage status
+      const sessionData = sessionStorage.getItem(this.STORAGE_KEYS.LAST_VIEWED_QUOTE);
+      this.elements.sessionStorageStatus.textContent = sessionData ? 'Quote cached' : 'No cache';
+      
+    } catch (error) {
+      console.error('Error updating storage status:', error);
     }
   }
   
@@ -322,6 +259,7 @@ function showGlobalNotification(message, type = 'info') {
     setTimeout(() => {
       this.displayQuote(quote);
       this.elements.quoteDisplay.style.opacity = '1';
+      this.saveLastViewedQuote(); // Save to session storage
     }, 150);
   }
   
@@ -545,7 +483,7 @@ function showGlobalNotification(message, type = 'info') {
     this.updateStats();
     
     // Show success notification
-    this.showNotification('Quote added successfully!', 'success');
+    this.showNotification('Quote added and saved to storage!', 'success');
     
     // Hide form
     this.toggleAddQuoteForm();
@@ -737,47 +675,4 @@ function showGlobalNotification(message, type = 'info') {
       zIndex: '10000',
       boxShadow: '0 4px 12px rgba(0, 0, 0, 0.2)',
       transform: 'translateX(100%)',
-      transition: 'transform 0.3s ease',
-      maxWidth: '300px'
-    });
-    
-    // Set background color based on type
-    switch (type) {
-      case 'success':
-        notification.style.background = 'linear-gradient(135deg, #11998e 0%, #38ef7d 100%)';
-        break;
-      case 'error':
-        notification.style.background = 'linear-gradient(135deg, #ff6b6b 0%, #ee5a24 100%)';
-        break;
-      default:
-        notification.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
-    }
-    
-    document.body.appendChild(notification);
-    
-    // Animate in
-    setTimeout(() => {
-      notification.style.transform = 'translateX(0)';
-    }, 100);
-    
-    // Animate out and remove
-    setTimeout(() => {
-      notification.style.transform = 'translateX(100%)';
-      setTimeout(() => {
-        if (notification.parentNode) {
-          notification.parentNode.removeChild(notification);
-        }
-      }, 300);
-    }, 3000);
-  }
-}
-
-// Initialize the application when DOM is loaded
-document.addEventListener('DOMContentLoaded', () => {
-  window.quoteGeneratorInstance = new QuoteGenerator();
-});
-
-// Export for potential module use
-if (typeof module !== 'undefined' && module.exports) {
-  module.exports = QuoteGenerator;
-}
+      transition:

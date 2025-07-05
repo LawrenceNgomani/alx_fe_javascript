@@ -53,6 +53,30 @@
         </div>
       </div>
       
+      <!-- NEW: JSON Import/Export Section -->
+      <div class="json-management-section">
+        <h3>Data Management</h3>
+        <div class="json-controls">
+          <div class="import-section">
+            <label for="importFile" class="file-label">Import Quotes (JSON)</label>
+            <input type="file" id="importFile" accept=".json" onchange="importFromJsonFile(event)" />
+          </div>
+          <div class="export-section">
+            <button id="exportBtn" class="btn btn-success" onclick="exportToJson()">Export Quotes (JSON)</button>
+          </div>
+        </div>
+        <div class="storage-info">
+          <div class="storage-item">
+            <span class="storage-label">Local Storage:</span>
+            <span id="localStorageStatus">Loading...</span>
+          </div>
+          <div class="storage-item">
+            <span class="storage-label">Session Storage:</span>
+            <span id="sessionStorageStatus">Loading...</span>
+          </div>
+        </div>
+      </div>
+      
       <!-- Conflict Resolution Modal -->
       <div id="conflictModal" class="modal hidden">
         <div class="modal-content">
