@@ -24,7 +24,19 @@
         this.loadUserPreferences();
         this.setupEventListeners();
         this.populateCategories();
-        this.displayRandomQuote();
+        
+        // Restore last filter selection
+        setTimeout(() => {
+            if (this.lastSelectedCategory) {
+                const categoryFilter = document.getElementById('categoryFilter');
+                if (categoryFilter) {
+                    categoryFilter.value = this.lastSelectedCategory;
+                    this.filterQuotes(); // Apply the saved filter
+                }
+            } else {
+                this.displayRandomQuote();
+            }
+        }, 100);
     }
 
     // Load quotes from localStorage
@@ -106,10 +118,11 @@
         }
     }
 
-    // Load user preferences from sessionStorage
+    // Load user preferences from localStorage (not sessionStorage for filter persistence)
     loadUserPreferences() {
         try {
-            const preferences = sessionStorage.getItem(this.STORAGE_KEYS.USER_PREFERENCES);
+            // Load from localStorage to persist across sessions
+            const preferences = localStorage.getItem(this.STORAGE_KEYS.USER_PREFERENCES);
             if (preferences) {
                 const parsed = JSON.parse(preferences);
                 // Apply any user preferences here
@@ -117,18 +130,35 @@
                     this.lastSelectedCategory = parsed.lastCategory;
                 }
             }
+            
+            // Also check sessionStorage for session-specific data
+            const sessionPreferences = sessionStorage.getItem(this.STORAGE_KEYS.USER_PREFERENCES);
+            if (sessionPreferences) {
+                const parsed = JSON.parse(sessionPreferences);
+                // Session-specific preferences can override if more recent
+                if (parsed.timestamp && (!preferences || parsed.timestamp > JSON.parse(preferences).timestamp)) {
+                    if (parsed.lastCategory) {
+                        this.lastSelectedCategory = parsed.lastCategory;
+                    }
+                }
+            }
         } catch (error) {
             console.error('Error loading user preferences:', error);
         }
     }
 
-    // Save user preferences to sessionStorage
+    // Save user preferences to both localStorage and sessionStorage
     saveUserPreferences() {
         try {
             const preferences = {
                 lastCategory: this.lastSelectedCategory,
                 timestamp: Date.now()
             };
+            
+            // Save to localStorage for persistence across sessions
+            localStorage.setItem(this.STORAGE_KEYS.USER_PREFERENCES, JSON.stringify(preferences));
+            
+            // Also save to sessionStorage for session-specific data
             sessionStorage.setItem(this.STORAGE_KEYS.USER_PREFERENCES, JSON.stringify(preferences));
         } catch (error) {
             console.error('Error saving user preferences:', error);
@@ -149,10 +179,10 @@
             addQuoteForm.addEventListener('submit', (e) => this.handleAddQuote(e));
         }
 
-        // Category filter
+        // Category filter (Original requirement)
         const categoryFilter = document.getElementById('categoryFilter');
         if (categoryFilter) {
-            categoryFilter.addEventListener('change', (e) => this.filterByCategory(e.target.value));
+            categoryFilter.addEventListener('change', (e) => this.filterQuotes());
         }
 
         // Search functionality
@@ -285,14 +315,14 @@
         if (!this.categories.includes(newQuote.category)) {
             this.categories.push(newQuote.category);
             this.saveCategories();
-            this.populateCategories();
+            this.populateCategories(); // Update dropdown with new category
         }
 
         // Save to localStorage
         this.saveQuotes();
         
-        // Update filtered quotes
-        this.filteredQuotes = [...this.quotes];
+        // Update filtered quotes and refresh display
+        this.updateFilteredQuotes();
         
         // Clear form
         quoteText.value = '';
@@ -305,6 +335,16 @@
         this.updateQuoteCount();
         
         alert('Quote added successfully!');
+    }
+
+    // Update filtered quotes based on current filter
+    updateFilteredQuotes() {
+        const categoryFilter = document.getElementById('categoryFilter');
+        if (categoryFilter && categoryFilter.value !== 'all') {
+            this.filterQuotes();
+        } else {
+            this.filteredQuotes = [...this.quotes];
+        }
     }
     // Handle adding new quote (enhanced form)
     handleAddQuote(event) {
@@ -330,14 +370,14 @@
         if (!this.categories.includes(newQuote.category)) {
             this.categories.push(newQuote.category);
             this.saveCategories();
-            this.populateCategories();
+            this.populateCategories(); // Update dropdown with new category
         }
 
         // Save to localStorage
         this.saveQuotes();
         
-        // Update filtered quotes
-        this.filteredQuotes = [...this.quotes];
+        // Update filtered quotes and refresh display
+        this.updateFilteredQuotes();
         
         // Reset form
         event.target.reset();
@@ -351,20 +391,13 @@
         alert('Quote added successfully!');
     }
 
-    // Filter quotes by category
+    // Filter quotes by category (Alternative method for backward compatibility)
     filterByCategory(category) {
-        this.lastSelectedCategory = category;
-        this.saveUserPreferences();
-        
-        if (category === 'all') {
-            this.filteredQuotes = [...this.quotes];
-        } else {
-            this.filteredQuotes = this.quotes.filter(quote => 
-                quote.category.toLowerCase() === category.toLowerCase()
-            );
+        const categoryFilter = document.getElementById('categoryFilter');
+        if (categoryFilter) {
+            categoryFilter.value = category;
         }
-        
-        this.updateQuoteCount();
+        this.filterQuotes();
     }
 
     // Search quotes
@@ -383,12 +416,25 @@
         this.updateQuoteCount();
     }
 
-    // Populate category dropdown
+    // Populate category dropdown (Required function name)
     populateCategories() {
         const categoryFilter = document.getElementById('categoryFilter');
         const addQuoteCategory = document.getElementById('addQuoteCategory');
         
+        // Extract unique categories from quotes
+        const uniqueCategories = [...new Set(this.quotes.map(quote => quote.category))];
+        
+        // Update categories array with unique categories from quotes
+        uniqueCategories.forEach(category => {
+            if (!this.categories.includes(category)) {
+                this.categories.push(category);
+            }
+        });
+        
         if (categoryFilter) {
+            // Save current selection
+            const currentSelection = categoryFilter.value;
+            
             categoryFilter.innerHTML = '<option value="all">All Categories</option>';
             this.categories.forEach(category => {
                 const option = document.createElement('option');
@@ -396,6 +442,17 @@
                 option.textContent = category.charAt(0).toUpperCase() + category.slice(1);
                 categoryFilter.appendChild(option);
             });
+            
+            // Restore selection if it still exists
+            if (currentSelection && [...categoryFilter.options].some(opt => opt.value === currentSelection)) {
+                categoryFilter.value = currentSelection;
+            } else if (this.lastSelectedCategory) {
+                // Restore last selected category from storage
+                const categoryExists = [...categoryFilter.options].some(opt => opt.value === this.lastSelectedCategory);
+                if (categoryExists) {
+                    categoryFilter.value = this.lastSelectedCategory;
+                }
+            }
         }
         
         if (addQuoteCategory) {
@@ -407,6 +464,31 @@
                 addQuoteCategory.appendChild(option);
             });
         }
+    }
+
+    // Filter quotes based on selected category (Required function name)
+    filterQuotes() {
+        const categoryFilter = document.getElementById('categoryFilter');
+        if (!categoryFilter) return;
+        
+        const selectedCategory = categoryFilter.value;
+        this.lastSelectedCategory = selectedCategory;
+        
+        // Save last selected filter to localStorage
+        this.saveUserPreferences();
+        
+        if (selectedCategory === 'all') {
+            this.filteredQuotes = [...this.quotes];
+        } else {
+            this.filteredQuotes = this.quotes.filter(quote => 
+                quote.category.toLowerCase() === selectedCategory.toLowerCase()
+            );
+        }
+        
+        this.updateQuoteCount();
+        
+        // Display a random quote from filtered results
+        this.displayRandomQuote();
     }
 
     // Update quote count display
@@ -575,6 +657,18 @@ window.addQuote = function() {
 window.createAddQuoteForm = function() {
     if (window.quoteGenerator) {
         window.quoteGenerator.createAddQuoteForm();
+    }
+};
+
+window.filterQuotes = function() {
+    if (window.quoteGenerator) {
+        window.quoteGenerator.filterQuotes();
+    }
+};
+
+window.populateCategories = function() {
+    if (window.quoteGenerator) {
+        window.quoteGenerator.populateCategories();
     }
 };
 
