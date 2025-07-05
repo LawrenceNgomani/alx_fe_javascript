@@ -912,4 +912,636 @@ class QuoteGenerator {
         this.saveQuotes();
         
         // Update filtered quotes and refresh display
+        // Update filtered quotes and refresh display
         this.updateFilteredQuotes();
+        this.updateQuoteCount();
+        
+        // Clear form
+        event.target.reset();
+        
+        // Show success message
+        this.showNotification(`Quote added successfully! ${this.pendingChanges.length} changes pending sync.`, 'success');
+        
+        // Display the new quote
+        this.displayQuote(newQuote);
+    }
+
+    // Update filtered quotes based on current filter
+    updateFilteredQuotes() {
+        const categoryFilter = document.getElementById('categoryFilter');
+        const searchInput = document.getElementById('searchInput');
+        
+        let filtered = [...this.quotes];
+        
+        // Apply category filter
+        if (categoryFilter && categoryFilter.value !== 'all') {
+            filtered = filtered.filter(quote => quote.category === categoryFilter.value);
+        }
+        
+        // Apply search filter
+        if (searchInput && searchInput.value.trim()) {
+            const searchTerm = searchInput.value.trim().toLowerCase();
+            filtered = filtered.filter(quote => 
+                quote.text.toLowerCase().includes(searchTerm) ||
+                quote.author.toLowerCase().includes(searchTerm) ||
+                quote.category.toLowerCase().includes(searchTerm)
+            );
+        }
+        
+        this.filteredQuotes = filtered;
+    }
+
+    // Filter quotes by category
+    filterQuotes() {
+        const categoryFilter = document.getElementById('categoryFilter');
+        if (!categoryFilter) return;
+        
+        const selectedCategory = categoryFilter.value;
+        this.lastSelectedCategory = selectedCategory;
+        this.saveUserPreferences();
+        
+        this.updateFilteredQuotes();
+        this.updateQuoteCount();
+        
+        // Display a random quote from the filtered set
+        this.displayRandomQuote();
+    }
+
+    // Search quotes
+    searchQuotes(searchTerm) {
+        this.updateFilteredQuotes();
+        this.updateQuoteCount();
+        
+        if (this.filteredQuotes.length > 0) {
+            this.displayRandomQuote();
+        } else {
+            this.displayQuote({
+                text: "No quotes found matching your search criteria.",
+                author: "Quote Generator",
+                category: "system"
+            });
+        }
+    }
+
+    // Update quote count display
+    updateQuoteCount() {
+        const quoteCount = document.getElementById('quoteCount');
+        if (quoteCount) {
+            const total = this.quotes.length;
+            const filtered = this.filteredQuotes.length;
+            const serverQuotes = this.quotes.filter(q => q.source === 'server').length;
+            const localQuotes = this.quotes.filter(q => q.source === 'local').length;
+            
+            quoteCount.innerHTML = `
+                <div class="quote-stats">
+                    <span>Showing: ${filtered} of ${total} quotes</span>
+                    <span>Local: ${localQuotes} | Server: ${serverQuotes}</span>
+                    <span>Pending: ${this.pendingChanges.length}</span>
+                </div>
+            `;
+        }
+    }
+
+    // Populate categories dropdown
+    populateCategories() {
+        const categoryFilter = document.getElementById('categoryFilter');
+        const addQuoteCategory = document.getElementById('addQuoteCategory');
+        
+        if (categoryFilter) {
+            // Store current selection
+            const currentValue = categoryFilter.value;
+            
+            // Clear existing options except 'all'
+            categoryFilter.innerHTML = '<option value="all">All Categories</option>';
+            
+            // Add category options
+            this.categories.forEach(category => {
+                const option = document.createElement('option');
+                option.value = category;
+                option.textContent = category.charAt(0).toUpperCase() + category.slice(1);
+                categoryFilter.appendChild(option);
+            });
+            
+            // Restore selection
+            categoryFilter.value = currentValue;
+        }
+        
+        if (addQuoteCategory) {
+            // Clear existing options
+            addQuoteCategory.innerHTML = '';
+            
+            // Add category options
+            this.categories.forEach(category => {
+                const option = document.createElement('option');
+                option.value = category;
+                option.textContent = category.charAt(0).toUpperCase() + category.slice(1);
+                addQuoteCategory.appendChild(option);
+            });
+        }
+    }
+
+    // Export quotes as JSON
+    exportQuotes() {
+        try {
+            const exportData = {
+                quotes: this.quotes,
+                categories: this.categories,
+                exportDate: new Date().toISOString(),
+                version: '1.0',
+                syncMetadata: this.syncMetadata
+            };
+            
+            const dataStr = JSON.stringify(exportData, null, 2);
+            const dataBlob = new Blob([dataStr], { type: 'application/json' });
+            
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(dataBlob);
+            link.download = `quotes_backup_${new Date().toISOString().split('T')[0]}.json`;
+            link.click();
+            
+            this.showNotification('Quotes exported successfully!', 'success');
+        } catch (error) {
+            console.error('Error exporting quotes:', error);
+            this.showNotification('Error exporting quotes. Please try again.', 'error');
+        }
+    }
+
+    // Import quotes from JSON file
+    importFromJsonFile(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+        
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            try {
+                const importData = JSON.parse(e.target.result);
+                this.processImportData(importData);
+            } catch (error) {
+                console.error('Error parsing import file:', error);
+                this.showNotification('Error reading import file. Please check the file format.', 'error');
+            }
+        };
+        
+        reader.onerror = () => {
+            this.showNotification('Error reading file. Please try again.', 'error');
+        };
+        
+        reader.readAsText(file);
+        
+        // Clear the file input
+        event.target.value = '';
+    }
+
+    // Process imported data
+    processImportData(importData) {
+        try {
+            let importedQuotes = [];
+            let importedCategories = [];
+            
+            // Handle different import formats
+            if (Array.isArray(importData)) {
+                // Simple array of quotes
+                importedQuotes = importData;
+            } else if (importData.quotes && Array.isArray(importData.quotes)) {
+                // Full export format
+                importedQuotes = importData.quotes;
+                if (importData.categories) {
+                    importedCategories = importData.categories;
+                }
+            } else {
+                throw new Error('Invalid import format');
+            }
+            
+            // Validate and process quotes
+            const validQuotes = importedQuotes.filter(quote => {
+                return quote.text && quote.author && quote.category;
+            });
+            
+            if (validQuotes.length === 0) {
+                throw new Error('No valid quotes found in import file');
+            }
+            
+            // Add unique IDs and timestamps to imported quotes
+            const processedQuotes = validQuotes.map(quote => ({
+                id: quote.id || this.generateId(),
+                text: quote.text.trim(),
+                author: quote.author.trim(),
+                category: quote.category.toLowerCase().trim(),
+                timestamp: quote.timestamp || Date.now(),
+                source: quote.source || 'imported'
+            }));
+            
+            // Merge with existing quotes (avoid duplicates)
+            const existingTexts = new Set(this.quotes.map(q => q.text.toLowerCase()));
+            const newQuotes = processedQuotes.filter(quote => 
+                !existingTexts.has(quote.text.toLowerCase())
+            );
+            
+            // Add new quotes
+            this.quotes.push(...newQuotes);
+            
+            // Merge categories
+            const newCategories = [...new Set([...this.categories, ...importedCategories])];
+            this.categories = newCategories;
+            
+            // Save changes
+            this.saveQuotes();
+            this.saveCategories();
+            
+            // Update UI
+            this.populateCategories();
+            this.updateFilteredQuotes();
+            this.updateQuoteCount();
+            
+            // Show success message
+            this.showNotification(
+                `Import successful! Added ${newQuotes.length} new quotes. ${validQuotes.length - newQuotes.length} duplicates skipped.`,
+                'success'
+            );
+            
+            // Display a random quote
+            this.displayRandomQuote();
+            
+        } catch (error) {
+            console.error('Error processing import data:', error);
+            this.showNotification(`Import failed: ${error.message}`, 'error');
+        }
+    }
+
+    // Clear all data from storage
+    clearStorage() {
+        if (confirm('Are you sure you want to clear all quotes and data? This action cannot be undone.')) {
+            try {
+                // Clear localStorage
+                Object.values(this.STORAGE_KEYS).forEach(key => {
+                    localStorage.removeItem(key);
+                });
+                
+                // Reset application state
+                this.quotes = [];
+                this.categories = ['inspirational', 'motivational', 'wisdom', 'humor', 'success'];
+                this.filteredQuotes = [];
+                this.currentQuoteIndex = 0;
+                this.favorites = [];
+                this.pendingChanges = [];
+                this.syncMetadata = {
+                    lastSync: null,
+                    serverVersion: 0,
+                    localVersion: 0,
+                    conflictCount: 0
+                };
+                
+                // Stop sync timer
+                this.stopPeriodicSync();
+                
+                // Update UI
+                this.populateCategories();
+                this.updateFilteredQuotes();
+                this.updateQuoteCount();
+                this.updateSyncStatus('cleared', 'All data cleared');
+                
+                // Display empty state
+                this.displayQuote({
+                    text: "All quotes have been cleared. Add some quotes to get started!",
+                    author: "Quote Generator",
+                    category: "system"
+                });
+                
+                this.showNotification('All data cleared successfully!', 'success');
+                
+            } catch (error) {
+                console.error('Error clearing storage:', error);
+                this.showNotification('Error clearing data. Please try again.', 'error');
+            }
+        }
+    }
+
+    // Advanced sync with retry mechanism
+    async performSyncWithRetry(retryCount = 0) {
+        try {
+            await this.performSync();
+        } catch (error) {
+            if (retryCount < this.SERVER_CONFIG.RETRY_ATTEMPTS) {
+                console.log(`Sync failed, retrying... (${retryCount + 1}/${this.SERVER_CONFIG.RETRY_ATTEMPTS})`);
+                
+                // Wait before retry
+                await new Promise(resolve => 
+                    setTimeout(resolve, this.SERVER_CONFIG.RETRY_DELAY * (retryCount + 1))
+                );
+                
+                return this.performSyncWithRetry(retryCount + 1);
+            } else {
+                throw error;
+            }
+        }
+    }
+
+    // Batch operations for better performance
+    batchAddQuotes(quotes) {
+        const processedQuotes = quotes.map(quote => ({
+            id: quote.id || this.generateId(),
+            text: quote.text.trim(),
+            author: quote.author.trim(),
+            category: quote.category.toLowerCase().trim(),
+            timestamp: quote.timestamp || Date.now(),
+            source: quote.source || 'batch'
+        }));
+        
+        this.quotes.push(...processedQuotes);
+        
+        // Add to pending changes
+        processedQuotes.forEach(quote => {
+            this.pendingChanges.push({
+                action: 'add',
+                quote: quote,
+                timestamp: Date.now()
+            });
+        });
+        
+        this.saveQuotes();
+        this.savePendingChanges();
+        this.updateFilteredQuotes();
+        this.updateQuoteCount();
+        
+        return processedQuotes.length;
+    }
+
+    // Get synchronization statistics
+    getSyncStats() {
+        return {
+            totalQuotes: this.quotes.length,
+            localQuotes: this.quotes.filter(q => q.source === 'local').length,
+            serverQuotes: this.quotes.filter(q => q.source === 'server').length,
+            pendingChanges: this.pendingChanges.length,
+            lastSync: this.syncMetadata.lastSync,
+            conflictCount: this.syncMetadata.conflictCount,
+            syncEnabled: !!this.syncTimer
+        };
+    }
+
+    // Advanced search with multiple criteria
+    advancedSearch(criteria) {
+        let results = [...this.quotes];
+        
+        if (criteria.text) {
+            results = results.filter(quote => 
+                quote.text.toLowerCase().includes(criteria.text.toLowerCase())
+            );
+        }
+        
+        if (criteria.author) {
+            results = results.filter(quote => 
+                quote.author.toLowerCase().includes(criteria.author.toLowerCase())
+            );
+        }
+        
+        if (criteria.category) {
+            results = results.filter(quote => 
+                quote.category === criteria.category
+            );
+        }
+        
+        if (criteria.source) {
+            results = results.filter(quote => 
+                quote.source === criteria.source
+            );
+        }
+        
+        if (criteria.dateRange) {
+            const { start, end } = criteria.dateRange;
+            results = results.filter(quote => {
+                const quoteDate = new Date(quote.timestamp);
+                return quoteDate >= start && quoteDate <= end;
+            });
+        }
+        
+        return results;
+    }
+
+    // Cleanup old data
+    cleanupOldData(maxAge = 30 * 24 * 60 * 60 * 1000) { // 30 days
+        const cutoffTime = Date.now() - maxAge;
+        const initialCount = this.quotes.length;
+        
+        // Remove old quotes (keep favorites and recent ones)
+        this.quotes = this.quotes.filter(quote => 
+            quote.timestamp > cutoffTime || 
+            this.favorites.includes(quote.id) ||
+            quote.source === 'server'
+        );
+        
+        const removedCount = initialCount - this.quotes.length;
+        
+        if (removedCount > 0) {
+            this.saveQuotes();
+            this.updateFilteredQuotes();
+            this.updateQuoteCount();
+            this.showNotification(`Cleaned up ${removedCount} old quotes`, 'info');
+        }
+        
+        return removedCount;
+    }
+
+    // Destroy instance and cleanup
+    destroy() {
+        // Stop sync timer
+        this.stopPeriodicSync();
+        
+        // Clear any pending callbacks
+        this.syncCallbacks = [];
+        
+        // Remove event listeners
+        const elements = [
+            'newQuote', 'addQuoteForm', 'categoryFilter', 'searchInput',
+            'exportQuotes', 'importFile', 'clearStorage', 'syncNow',
+            'toggleSync', 'resolveConflicts'
+        ];
+        
+        elements.forEach(id => {
+            const element = document.getElementById(id);
+            if (element) {
+                element.replaceWith(element.cloneNode(true));
+            }
+        });
+        
+        // Clear references
+        this.quotes = null;
+        this.categories = null;
+        this.filteredQuotes = null;
+        this.pendingChanges = null;
+        this.syncMetadata = null;
+        
+        console.log('QuoteGenerator instance destroyed');
+    }
+}
+
+// Initialize the application when DOM is loaded
+document.addEventListener('DOMContentLoaded', () => {
+    // Check if we're in a browser environment with localStorage
+    if (typeof Storage !== 'undefined') {
+        window.quoteGenerator = new QuoteGenerator();
+    } else {
+        console.error('localStorage is not supported in this environment');
+        alert('This application requires localStorage support. Please use a modern browser.');
+    }
+});
+
+// Handle page visibility changes for sync optimization
+document.addEventListener('visibilitychange', () => {
+    if (window.quoteGenerator) {
+        if (document.hidden) {
+            // Page is hidden, pause sync
+            window.quoteGenerator.stopPeriodicSync();
+        } else {
+            // Page is visible, resume sync
+            window.quoteGenerator.startPeriodicSync();
+        }
+    }
+});
+
+// Handle beforeunload for cleanup
+window.addEventListener('beforeunload', () => {
+    if (window.quoteGenerator) {
+        // Save any pending changes
+        window.quoteGenerator.savePendingChanges();
+        window.quoteGenerator.saveSyncMetadata();
+    }
+});
+
+// Global utility functions
+window.quoteUtils = {
+    // Export quotes to different formats
+    exportToCSV: (quotes) => {
+        const headers = ['ID', 'Text', 'Author', 'Category', 'Source', 'Timestamp'];
+        const csvContent = [
+            headers.join(','),
+            ...quotes.map(quote => [
+                quote.id,
+                `"${quote.text.replace(/"/g, '""')}"`,
+                `"${quote.author.replace(/"/g, '""')}"`,
+                quote.category,
+                quote.source,
+                new Date(quote.timestamp).toISOString()
+            ].join(','))
+        ].join('\n');
+        
+        const blob = new Blob([csvContent], { type: 'text/csv' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `quotes_export_${new Date().toISOString().split('T')[0]}.csv`;
+        link.click();
+        URL.revokeObjectURL(url);
+    },
+    
+    // Import quotes from CSV
+    importFromCSV: (csvText) => {
+        const lines = csvText.split('\n');
+        const headers = lines[0].split(',');
+        const quotes = [];
+        
+        for (let i = 1; i < lines.length; i++) {
+            const values = lines[i].split(',');
+            if (values.length >= 4) {
+                quotes.push({
+                    text: values[1].replace(/^"|"$/g, '').replace(/""/g, '"'),
+                    author: values[2].replace(/^"|"$/g, '').replace(/""/g, '"'),
+                    category: values[3],
+                    source: values[4] || 'imported'
+                });
+            }
+        }
+        
+        return quotes;
+    },
+    
+    // Generate random quote of the day
+    getQuoteOfTheDay: (quotes) => {
+        const today = new Date().toDateString();
+        const seed = today.split('').reduce((a, b) => {
+            a = ((a << 5) - a) + b.charCodeAt(0);
+            return a & a;
+        }, 0);
+        
+        const index = Math.abs(seed) % quotes.length;
+        return quotes[index];
+    },
+    
+    // Validate quote object
+    validateQuote: (quote) => {
+        const errors = [];
+        
+        if (!quote.text || typeof quote.text !== 'string' || quote.text.trim().length === 0) {
+            errors.push('Quote text is required');
+        }
+        
+        if (!quote.author || typeof quote.author !== 'string' || quote.author.trim().length === 0) {
+            errors.push('Author is required');
+        }
+        
+        if (!quote.category || typeof quote.category !== 'string' || quote.category.trim().length === 0) {
+            errors.push('Category is required');
+        }
+        
+        if (quote.text && quote.text.length > 500) {
+            errors.push('Quote text is too long (max 500 characters)');
+        }
+        
+        if (quote.author && quote.author.length > 100) {
+            errors.push('Author name is too long (max 100 characters)');
+        }
+        
+        return {
+            isValid: errors.length === 0,
+            errors: errors
+        };
+    }
+};
+
+// Console debugging helpers
+window.debugQuotes = {
+    showStats: () => {
+        if (window.quoteGenerator) {
+            console.table(window.quoteGenerator.getSyncStats());
+        }
+    },
+    
+    showQuotes: () => {
+        if (window.quoteGenerator) {
+            console.table(window.quoteGenerator.quotes);
+        }
+    },
+    
+    showPendingChanges: () => {
+        if (window.quoteGenerator) {
+            console.table(window.quoteGenerator.pendingChanges);
+        }
+    },
+    
+    triggerSync: () => {
+        if (window.quoteGenerator) {
+            window.quoteGenerator.manualSync();
+        }
+    },
+    
+    simulateConflict: () => {
+        if (window.quoteGenerator) {
+            // Add a quote that will conflict with server data
+            const conflictQuote = {
+                id: 'conflict_test',
+                text: 'This is a test conflict quote',
+                author: 'Test Author',
+                category: 'test',
+                timestamp: Date.now(),
+                source: 'local'
+            };
+            
+            window.quoteGenerator.quotes.push(conflictQuote);
+            window.quoteGenerator.saveQuotes();
+            console.log('Conflict quote added for testing');
+        }
+    }
+};
+
+console.log('Quote Generator with Server Sync loaded successfully!');
+console.log('Available debug commands: window.debugQuotes.showStats(), showQuotes(), showPendingChanges(), triggerSync(), simulateConflict()');
