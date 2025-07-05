@@ -11,14 +11,18 @@
     <header>
       <h1>Dynamic Quote Generator</h1>
       <div class="sync-status">
-        <span id="syncStatus" class="sync-indicator">●</span>
+        <span id="syncStatus" class="sync-indicator offline">●</span>
         <span id="syncText">Offline</span>
         <button id="manualSyncBtn" class="btn btn-mini">Sync Now</button>
       </div>
     </header>
     
     <main>
-      <div id="quoteDisplay" class="quote-container"></div>
+      <div id="quoteDisplay" class="quote-container">
+        <div id="quoteText" class="quote-text">Loading...</div>
+        <div id="quoteAuthor" class="quote-author"></div>
+        <div id="quoteCategory" class="quote-category"></div>
+      </div>
       
       <div class="controls">
         <button id="newQuote" class="btn btn-primary">Show New Quote</button>
@@ -41,7 +45,29 @@
         </select>
       </div>
       
-      <div id="addQuoteForm" class="form-container hidden"></div>
+      <div id="addQuoteForm" class="form-container hidden">
+        <h3>Add New Quote</h3>
+        <form id="quoteForm">
+          <div class="form-group">
+            <label for="quoteText">Quote Text:</label>
+            <textarea id="quoteText" name="quoteText" placeholder="Enter the quote text..." required></textarea>
+          </div>
+          <div class="form-group">
+            <label for="quoteAuthor">Author:</label>
+            <input type="text" id="quoteAuthor" name="quoteAuthor" placeholder="Enter author name..." required>
+          </div>
+          <div class="form-group">
+            <label for="quoteCategory">Category:</label>
+            <select id="quoteCategory" name="quoteCategory" required>
+              <option value="">Select a category...</option>
+            </select>
+          </div>
+          <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Add Quote</button>
+            <button type="button" id="cancelAddQuote" class="btn btn-secondary">Cancel</button>
+          </div>
+        </form>
+      </div>
       
       <!-- Step 3: Direct Quote Addition Form -->
       <div class="simple-form-container">
@@ -53,7 +79,7 @@
         </div>
       </div>
       
-      <!-- NEW: JSON Import/Export Section -->
+      <!-- JSON Import/Export Section -->
       <div class="json-management-section">
         <h3>Data Management</h3>
         <div class="json-controls">
@@ -67,12 +93,16 @@
         </div>
         <div class="storage-info">
           <div class="storage-item">
-            <span class="storage-label">Local Storage:</span>
-            <span id="localStorageStatus">Loading...</span>
+            <span class="storage-label">Total Quotes:</span>
+            <span id="totalQuotesCount">0</span>
           </div>
           <div class="storage-item">
-            <span class="storage-label">Session Storage:</span>
-            <span id="sessionStorageStatus">Loading...</span>
+            <span class="storage-label">Current Filter:</span>
+            <span id="currentFilterStatus">All Categories</span>
+          </div>
+          <div class="storage-item">
+            <span class="storage-label">Quotes Shown:</span>
+            <span id="filteredQuotesCount">0</span>
           </div>
         </div>
       </div>
@@ -85,48 +115,154 @@
             <button id="closeConflictModal" class="close-btn">&times;</button>
           </div>
           <div class="modal-body">
-            <p>Server data differs from your local data. How would you like to resolve this?</p>
+            <p>Server data differs from your local data. How would you like to resolve this conflict?</p>
+            <div class="conflict-summary">
+              <div class="conflict-item">
+                <span class="conflict-label">Server Quotes:</span>
+                <span id="serverQuotesCount">0</span>
+              </div>
+              <div class="conflict-item">
+                <span class="conflict-label">Local Quotes:</span>
+                <span id="localQuotesCount">0</span>
+              </div>
+              <div class="conflict-item">
+                <span class="conflict-label">Last Server Update:</span>
+                <span id="serverUpdateTime">Unknown</span>
+              </div>
+              <div class="conflict-item">
+                <span class="conflict-label">Last Local Update:</span>
+                <span id="localUpdateTime">Unknown</span>
+              </div>
+            </div>
             <div class="conflict-options">
               <button id="useServerData" class="btn btn-primary">Use Server Data</button>
               <button id="useLocalData" class="btn btn-secondary">Keep Local Data</button>
               <button id="mergeData" class="btn btn-success">Merge Both</button>
             </div>
-            <div id="conflictDetails" class="conflict-details"></div>
+            <div id="conflictDetails" class="conflict-details hidden">
+              <h4>Conflict Details:</h4>
+              <div id="conflictDetailsList"></div>
+            </div>
+            <div class="conflict-actions">
+              <button id="showConflictDetails" class="btn btn-mini">Show Details</button>
+              <button id="hideConflictDetails" class="btn btn-mini hidden">Hide Details</button>
+            </div>
           </div>
         </div>
       </div>
       
       <!-- Server Status Panel -->
       <div class="server-status-panel">
-        <h4>Server Status</h4>
+        <h4>Server Sync Status</h4>
         <div class="status-grid">
           <div class="status-item">
+            <span class="status-label">Connection:</span>
+            <span id="connectionStatus" class="status-value">Disconnected</span>
+          </div>
+          <div class="status-item">
             <span class="status-label">Last Sync:</span>
-            <span id="lastSyncTime">Never</span>
+            <span id="lastSyncTime" class="status-value">Never</span>
           </div>
           <div class="status-item">
             <span class="status-label">Sync Interval:</span>
-            <span id="syncInterval">30s</span>
+            <span id="syncInterval" class="status-value">30s</span>
           </div>
           <div class="status-item">
             <span class="status-label">Conflicts Resolved:</span>
-            <span id="conflictsResolved">0</span>
+            <span id="conflictsResolved" class="status-value">0</span>
+          </div>
+          <div class="status-item">
+            <span class="status-label">Data Version:</span>
+            <span id="dataVersion" class="status-value">v1.0</span>
+          </div>
+          <div class="status-item">
+            <span class="status-label">Sync Status:</span>
+            <span id="syncStatusText" class="status-value">Idle</span>
           </div>
         </div>
         <div class="sync-controls">
-          <label for="autoSyncToggle">Auto Sync:</label>
-          <input type="checkbox" id="autoSyncToggle" checked>
-          <select id="syncIntervalSelect">
-            <option value="15000">15 seconds</option>
-            <option value="30000" selected>30 seconds</option>
-            <option value="60000">1 minute</option>
-            <option value="300000">5 minutes</option>
-          </select>
+          <div class="sync-control-group">
+            <label for="autoSyncToggle">Auto Sync:</label>
+            <input type="checkbox" id="autoSyncToggle" checked>
+          </div>
+          <div class="sync-control-group">
+            <label for="syncIntervalSelect">Interval:</label>
+            <select id="syncIntervalSelect">
+              <option value="15000">15 seconds</option>
+              <option value="30000" selected>30 seconds</option>
+              <option value="60000">1 minute</option>
+              <option value="300000">5 minutes</option>
+              <option value="900000">15 minutes</option>
+            </select>
+          </div>
+          <div class="sync-control-group">
+            <button id="forceSyncBtn" class="btn btn-primary">Force Sync</button>
+            <button id="resetSyncBtn" class="btn btn-danger">Reset Sync</button>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Sync Notification Area -->
+      <div id="syncNotifications" class="sync-notifications hidden">
+        <div class="notification-content">
+          <span id="notificationIcon" class="notification-icon">ℹ️</span>
+          <span id="notificationMessage" class="notification-message"></span>
+          <button id="closeNotification" class="notification-close">&times;</button>
+        </div>
+      </div>
+      
+      <!-- Advanced Sync Options -->
+      <div class="advanced-sync-options">
+        <h4>Advanced Sync Options</h4>
+        <div class="advanced-options-grid">
+          <div class="option-item">
+            <label for="conflictResolutionMode">Default Conflict Resolution:</label>
+            <select id="conflictResolutionMode">
+              <option value="ask">Ask User</option>
+              <option value="server">Prefer Server</option>
+              <option value="local">Prefer Local</option>
+              <option value="merge">Always Merge</option>
+            </select>
+          </div>
+          <div class="option-item">
+            <label for="syncOnlyOnChanges">Sync Only On Changes:</label>
+            <input type="checkbox" id="syncOnlyOnChanges" checked>
+          </div>
+          <div class="option-item">
+            <label for="retryFailedSync">Retry Failed Syncs:</label>
+            <input type="checkbox" id="retryFailedSync" checked>
+          </div>
+          <div class="option-item">
+            <label for="maxRetryAttempts">Max Retry Attempts:</label>
+            <select id="maxRetryAttempts">
+              <option value="1">1</option>
+              <option value="3" selected>3</option>
+              <option value="5">5</option>
+              <option value="10">10</option>
+            </select>
+          </div>
         </div>
       </div>
       
       <div class="stats">
-        <div id="quoteStats" class="stats-display"></div>
+        <div id="quoteStats" class="stats-display">
+          <div class="stat-item">
+            <span class="stat-label">Total Quotes:</span>
+            <span id="totalQuotes" class="stat-number">0</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-label">Categories:</span>
+            <span id="totalCategories" class="stat-number">0</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-label">Displayed:</span>
+            <span id="displayedQuotes" class="stat-number">0</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-label">Sync Health:</span>
+            <span id="syncHealth" class="stat-number">100%</span>
+          </div>
+        </div>
       </div>
     </main>
   </div>
