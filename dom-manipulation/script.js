@@ -204,6 +204,11 @@
         this.saveLastQuote(quote);
     }
 
+    // Original function name for compatibility
+    showRandomQuote() {
+        this.displayRandomQuote();
+    }
+
     // Display a specific quote
     displayQuote(quote) {
         const quoteText = document.getElementById('quoteText');
@@ -224,9 +229,85 @@
         }
     }
 
-    // Handle adding new quote
+    // Create Add Quote Form (original function for compatibility)
+    createAddQuoteForm() {
+        const quoteDisplay = document.getElementById('quoteDisplay');
+        if (!quoteDisplay) return;
+
+        // Check if form already exists
+        if (document.getElementById('addQuoteForm')) {
+            return;
+        }
+
+        const formContainer = document.createElement('div');
+        formContainer.id = 'addQuoteForm';
+        formContainer.innerHTML = `
+            <h3>Add New Quote</h3>
+            <div>
+                <input id="newQuoteText" type="text" placeholder="Enter a new quote" />
+                <input id="newQuoteCategory" type="text" placeholder="Enter quote category" />
+                <button onclick="addQuote()">Add Quote</button>
+            </div>
+        `;
+
+        quoteDisplay.appendChild(formContainer);
+    }
+
+    // Add quote function for compatibility with original requirements
+    addQuote() {
+        const quoteText = document.getElementById('newQuoteText');
+        const quoteCategory = document.getElementById('newQuoteCategory');
+        
+        if (!quoteText || !quoteCategory) {
+            alert('Quote form not found. Please create the form first.');
+            return;
+        }
+
+        const text = quoteText.value.trim();
+        const category = quoteCategory.value.trim();
+
+        if (!text || !category) {
+            alert('Please fill in both quote text and category');
+            return;
+        }
+
+        const newQuote = {
+            id: this.generateId(),
+            text: text,
+            author: 'Anonymous', // Default author for simple form
+            category: category.toLowerCase()
+        };
+
+        // Add to quotes array
+        this.quotes.push(newQuote);
+        
+        // Add category if it doesn't exist
+        if (!this.categories.includes(newQuote.category)) {
+            this.categories.push(newQuote.category);
+            this.saveCategories();
+            this.populateCategories();
+        }
+
+        // Save to localStorage
+        this.saveQuotes();
+        
+        // Update filtered quotes
+        this.filteredQuotes = [...this.quotes];
+        
+        // Clear form
+        quoteText.value = '';
+        quoteCategory.value = '';
+        
+        // Display the new quote
+        this.displayQuote(newQuote);
+        
+        // Update quote count
+        this.updateQuoteCount();
+        
+        alert('Quote added successfully!');
+    }
+    // Handle adding new quote (enhanced form)
     handleAddQuote(event) {
-        event.preventDefault();
         
         const formData = new FormData(event.target);
         const newQuote = {
@@ -477,6 +558,25 @@
         return size;
     }
 }
+
+// Make functions globally available for compatibility
+window.showRandomQuote = function() {
+    if (window.quoteGenerator) {
+        window.quoteGenerator.showRandomQuote();
+    }
+};
+
+window.addQuote = function() {
+    if (window.quoteGenerator) {
+        window.quoteGenerator.addQuote();
+    }
+};
+
+window.createAddQuoteForm = function() {
+    if (window.quoteGenerator) {
+        window.quoteGenerator.createAddQuoteForm();
+    }
+};
 
 // Initialize the application when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
