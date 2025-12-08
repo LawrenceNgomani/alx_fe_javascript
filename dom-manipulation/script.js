@@ -773,7 +773,7 @@ class QuoteGenerator {
             this.lastSyncTime = new Date().toLocaleTimeString();
             this.saveSyncMetadata();
             this.updateSyncStatus('online');
-            this.showNotification('✓ Sync successful!', 'success');
+            this.showNotification('Quotes synced with server!', 'success');
 
         } catch (error) {
             console.error('Sync error:', error);
