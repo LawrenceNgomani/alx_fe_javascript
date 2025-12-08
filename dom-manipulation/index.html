@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Dynamic Quote Generator</title>
-  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <div class="container">
@@ -29,36 +29,29 @@
         <button id="addQuoteBtn" class="btn btn-secondary">Add New Quote</button>
       </div>
       
-      <div class="category-filter">
-        <label for="categorySelect">Filter by Category:</label>
-        <select id="categorySelect">
-          <option value="all">All Categories</option>
-        </select>
-      </div>
-      
-      <!-- Step 1: Category Filter as Required -->
+      <!-- Category Filter Section -->
       <div class="category-filter-section">
         <label for="categoryFilter">Quick Filter:</label>
-        <select id="categoryFilter" onchange="filterQuotes()">
+        <select id="categoryFilter">
           <option value="all">All Categories</option>
-          <!-- Dynamically populated categories -->
         </select>
       </div>
       
+      <!-- Add Quote Form -->
       <div id="addQuoteForm" class="form-container hidden">
         <h3>Add New Quote</h3>
         <form id="quoteForm">
           <div class="form-group">
-            <label for="quoteText">Quote Text:</label>
-            <textarea id="quoteText" name="quoteText" placeholder="Enter the quote text..." required></textarea>
+            <label for="formQuoteText">Quote Text:</label>
+            <textarea id="formQuoteText" name="quoteText" placeholder="Enter the quote text..." required></textarea>
           </div>
           <div class="form-group">
-            <label for="quoteAuthor">Author:</label>
-            <input type="text" id="quoteAuthor" name="quoteAuthor" placeholder="Enter author name..." required>
+            <label for="formQuoteAuthor">Author:</label>
+            <input type="text" id="formQuoteAuthor" name="quoteAuthor" placeholder="Enter author name..." required>
           </div>
           <div class="form-group">
-            <label for="quoteCategory">Category:</label>
-            <select id="quoteCategory" name="quoteCategory" required>
+            <label for="addQuoteCategory">Category:</label>
+            <select id="addQuoteCategory" name="quoteCategory" required>
               <option value="">Select a category...</option>
             </select>
           </div>
@@ -69,7 +62,7 @@
         </form>
       </div>
       
-      <!-- Step 3: Direct Quote Addition Form -->
+      <!-- Quick Add Quote Form -->
       <div class="simple-form-container">
         <h3>Quick Add Quote</h3>
         <div>
@@ -79,31 +72,23 @@
         </div>
       </div>
       
-      <!-- JSON Import/Export Section -->
+      <!-- Data Management Section -->
       <div class="json-management-section">
         <h3>Data Management</h3>
         <div class="json-controls">
-          <div class="import-section">
-            <label for="importFile" class="file-label">Import Quotes (JSON)</label>
-            <input type="file" id="importFile" accept=".json" onchange="importFromJsonFile(event)" />
-          </div>
-          <div class="export-section">
-            <button id="exportBtn" class="btn btn-success" onclick="exportToJson()">Export Quotes (JSON)</button>
-          </div>
+          <label for="importFile" class="file-label">Import Quotes (JSON)</label>
+          <input type="file" id="importFile" accept=".json" />
+          <button id="exportBtn" class="btn btn-success">Export Quotes (JSON)</button>
+          <button id="clearStorageBtn" class="btn btn-danger">Clear All Data</button>
         </div>
-        <div class="storage-info">
-          <div class="storage-item">
-            <span class="storage-label">Total Quotes:</span>
-            <span id="totalQuotesCount">0</span>
-          </div>
-          <div class="storage-item">
-            <span class="storage-label">Current Filter:</span>
-            <span id="currentFilterStatus">All Categories</span>
-          </div>
-          <div class="storage-item">
-            <span class="storage-label">Quotes Shown:</span>
-            <span id="filteredQuotesCount">0</span>
-          </div>
+      </div>
+      
+      <!-- Sync Notification Area -->
+      <div id="syncNotifications" class="sync-notifications hidden">
+        <div class="notification-content">
+          <span id="notificationIcon" class="notification-icon">ℹ️</span>
+          <span id="notificationMessage" class="notification-message"></span>
+          <button id="closeNotification" class="notification-close">&times;</button>
         </div>
       </div>
       
@@ -192,22 +177,12 @@
               <option value="30000" selected>30 seconds</option>
               <option value="60000">1 minute</option>
               <option value="300000">5 minutes</option>
-              <option value="900000">15 minutes</option>
             </select>
           </div>
           <div class="sync-control-group">
             <button id="forceSyncBtn" class="btn btn-primary">Force Sync</button>
             <button id="resetSyncBtn" class="btn btn-danger">Reset Sync</button>
           </div>
-        </div>
-      </div>
-      
-      <!-- Sync Notification Area -->
-      <div id="syncNotifications" class="sync-notifications hidden">
-        <div class="notification-content">
-          <span id="notificationIcon" class="notification-icon">ℹ️</span>
-          <span id="notificationMessage" class="notification-message"></span>
-          <button id="closeNotification" class="notification-close">&times;</button>
         </div>
       </div>
       
@@ -244,6 +219,7 @@
         </div>
       </div>
       
+      <!-- Statistics Display -->
       <div class="stats">
         <div id="quoteStats" class="stats-display">
           <div class="stat-item">
