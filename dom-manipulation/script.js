@@ -1,4 +1,4 @@
-// Quote Generator Class with Server Sync
+// Quote Generator Class with Server Sync and Conflict Resolution
 class QuoteGenerator {
     constructor() {
         // Storage keys
@@ -30,6 +30,8 @@ class QuoteGenerator {
         this.retryCount = 0;
         this.serverData = null;
         this.lastLocalTimestamp = Date.now();
+        this.pendingServerQuotes = null;
+        this.lastLocalHash = null;
         
         // Initialize the application
         this.init();
@@ -73,6 +75,7 @@ class QuoteGenerator {
                 this.saveQuotes();
             }
             this.filteredQuotes = [...this.quotes];
+            this.calculateLocalHash();
         } catch (error) {
             console.error('Error loading quotes:', error);
             this.initializeDefaultQuotes();
@@ -120,11 +123,25 @@ class QuoteGenerator {
         ];
     }
 
+    // Calculate hash of local data for conflict detection
+    calculateLocalHash() {
+        const data = JSON.stringify(this.quotes);
+        let hash = 0;
+        for (let i = 0; i < data.length; i++) {
+            const char = data.charCodeAt(i);
+            hash = ((hash << 5) - hash) + char;
+            hash = hash & hash;
+        }
+        this.lastLocalHash = hash;
+        return hash;
+    }
+
     // Save quotes to localStorage
     saveQuotes() {
         try {
             localStorage.setItem(this.STORAGE_KEYS.QUOTES, JSON.stringify(this.quotes));
             this.lastLocalTimestamp = Date.now();
+            this.calculateLocalHash();
         } catch (error) {
             console.error('Error saving quotes:', error);
         }
@@ -348,6 +365,15 @@ class QuoteGenerator {
         if (maxRetrySelect) {
             maxRetrySelect.addEventListener('change', (e) => {
                 this.maxRetryAttempts = parseInt(e.target.value);
+            });
+        }
+
+        // Close notification
+        const closeNotification = document.getElementById('closeNotification');
+        if (closeNotification) {
+            closeNotification.addEventListener('click', () => {
+                const notif = document.getElementById('syncNotifications');
+                if (notif) notif.classList.add('hidden');
             });
         }
     }
@@ -589,11 +615,13 @@ class QuoteGenerator {
         if (confirm('Clear all quotes and data? This cannot be undone.')) {
             localStorage.removeItem(this.STORAGE_KEYS.QUOTES);
             localStorage.removeItem(this.STORAGE_KEYS.CATEGORIES);
+            localStorage.removeItem(this.STORAGE_KEYS.SYNC_METADATA);
             
             this.quotes = [];
             this.categories = ['inspirational', 'motivational', 'wisdom', 'humor', 'success'];
             this.filteredQuotes = [];
             
+            this.initializeDefaultQuotes();
             this.saveQuotes();
             this.saveCategories();
             this.populateCategories();
@@ -604,20 +632,23 @@ class QuoteGenerator {
         }
     }
 
-    // Server Sync Methods
+    // ==================== SERVER SYNC FUNCTIONS ====================
 
-    // Fetch server data (simulated)
-    async fetchServerData() {
+    // Fetch quotes from server using mock API
+    async fetchQuotesFromServer() {
         try {
-            // Simulate API call using JSONPlaceholder
-            const response = await fetch('https://jsonplaceholder.typicode.com/todos/1');
-            if (!response.ok) throw new Error('Server unavailable');
+            // Using JSONPlaceholder as mock API
+            const response = await fetch('https://jsonplaceholder.typicode.com/posts/1');
             
-            // Simulate server quotes (in real app, this would be actual server data)
+            if (!response.ok) {
+                throw new Error('Server unavailable');
+            }
+
+            // Simulate server quotes with realistic data
             const serverQuotes = [
                 {
                     id: 'server_1',
-                    text: "Success is not final, failure is not fatal.",
+                    text: "Success is not final, failure is not fatal: it is the courage to continue that counts.",
                     author: "Winston Churchill",
                     category: "success",
                     timestamp: Date.now() - 100000
@@ -628,102 +659,157 @@ class QuoteGenerator {
                     author: "Tony Robbins",
                     category: "motivational",
                     timestamp: Date.now() - 50000
+                },
+                {
+                    id: 'server_3',
+                    text: "Believe you can and you're halfway there.",
+                    author: "Theodore Roosevelt",
+                    category: "inspirational",
+                    timestamp: Date.now() - 30000
                 }
             ];
-            
+
             this.serverData = {
                 quotes: serverQuotes,
-                timestamp: Date.now()
+                timestamp: Date.now(),
+                serverHash: this.calculateHash(serverQuotes)
             };
-            
+
             return this.serverData;
         } catch (error) {
-            console.error('Server fetch error:', error);
+            console.error('Error fetching from server:', error);
             return null;
         }
     }
 
-    // Start auto-sync
-    startAutoSync() {
-        if (this.syncIntervalId) clearInterval(this.syncIntervalId);
-        
-        this.syncIntervalId = setInterval(() => {
-            if (this.autoSync && !this.isSyncing) {
-                this.performSync(false);
+    // Post data to server using mock API
+    async postQuotesToServer() {
+        try {
+            const dataToPost = {
+                quotes: this.quotes,
+                categories: this.categories,
+                timestamp: Date.now(),
+                localHash: this.lastLocalHash
+            };
+
+            // Using JSONPlaceholder for mock POST
+            const response = await fetch('https://jsonplaceholder.typicode.com/posts', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    title: 'Quote Generator Sync',
+                    body: JSON.stringify(dataToPost),
+                    userId: 1
+                })
+            });
+
+            if (!response.ok) {
+                throw new Error('Server post failed');
             }
-        }, this.syncInterval);
-        
-        this.updateSyncStatus('online');
-    }
 
-    // Stop auto-sync
-    stopAutoSync() {
-        if (this.syncIntervalId) {
-            clearInterval(this.syncIntervalId);
-            this.syncIntervalId = null;
+            const result = await response.json();
+            console.log('Data posted to server:', result);
+            return true;
+        } catch (error) {
+            console.error('Error posting to server:', error);
+            return false;
         }
-        this.updateSyncStatus('offline');
     }
 
-    // Perform sync
-    async performSync(isManual) {
+    // Calculate hash for data
+    calculateHash(data) {
+        const str = JSON.stringify(data);
+        let hash = 0;
+        for (let i = 0; i < str.length; i++) {
+            const char = str.charCodeAt(i);
+            hash = ((hash << 5) - hash) + char;
+            hash = hash & hash;
+        }
+        return hash;
+    }
+
+    // Sync quotes with server
+    async syncQuotes() {
         if (this.isSyncing) return;
-        
+
         this.isSyncing = true;
         this.updateSyncStatus('syncing');
-        
+
         try {
-            const serverData = await this.fetchServerData();
+            // Post local data to server
+            const postSuccess = await this.postQuotesToServer();
             
+            // Fetch updated data from server
+            const serverData = await this.fetchQuotesFromServer();
+
             if (!serverData) {
                 this.retryCount++;
                 if (this.retryFailedSync && this.retryCount < this.maxRetryAttempts) {
                     this.showNotification('Sync failed, retrying...', 'warning');
+                    setTimeout(() => this.syncQuotes(), 2000);
                 } else {
-                    this.showNotification('Sync failed', 'error');
+                    this.showNotification('Sync failed - server unavailable', 'error');
                     this.updateSyncStatus('offline');
+                    this.retryCount = 0;
                 }
                 this.isSyncing = false;
                 return;
             }
 
             this.retryCount = 0;
-            
+
             // Check for conflicts
-            if (this.hasConflicts(serverData.quotes)) {
+            if (this.detectConflicts(serverData.quotes)) {
                 this.handleConflict(serverData.quotes);
                 this.isSyncing = false;
                 return;
             }
 
-            // Merge data
+            // No conflict - merge data
             this.mergeServerData(serverData.quotes);
             
             this.lastSyncTime = new Date().toLocaleTimeString();
             this.saveSyncMetadata();
             this.updateSyncStatus('online');
-            this.showNotification('Sync successful', 'success');
-            
+            this.showNotification('✓ Sync successful!', 'success');
+
         } catch (error) {
             console.error('Sync error:', error);
             this.showNotification('Sync error occurred', 'error');
             this.updateSyncStatus('offline');
         }
-        
+
         this.isSyncing = false;
     }
 
-    // Check for conflicts
-    hasConflicts(serverQuotes) {
-        const serverIds = serverQuotes.map(q => q.id);
-        const localIds = this.quotes.map(q => q.id);
-        
-        // Check if there are different quotes
-        return serverQuotes.length !== this.quotes.length ||
-               !serverQuotes.every((sq, i) => this.quotes[i] && sq.id === this.quotes[i].id);
+    // Detect conflicts between local and server data
+    detectConflicts(serverQuotes) {
+        // Check if quote counts differ
+        if (serverQuotes.length !== this.quotes.length) {
+            return true;
+        }
+
+        // Check if IDs match
+        const serverIds = new Set(serverQuotes.map(q => q.id));
+        const localIds = new Set(this.quotes.map(q => q.id));
+
+        // If sets differ, there's a conflict
+        if (serverIds.size !== localIds.size) {
+            return true;
+        }
+
+        for (let id of localIds) {
+            if (!serverIds.has(id)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
-    // Handle conflict
+    // Handle conflicts with user notification
     handleConflict(serverQuotes) {
         if (this.conflictResolutionMode === 'ask') {
             this.showConflictModal(serverQuotes);
@@ -736,7 +822,7 @@ class QuoteGenerator {
         }
     }
 
-    // Show conflict modal
+    // Show conflict modal to user
     showConflictModal(serverQuotes) {
         const modal = document.getElementById('conflictModal');
         if (!modal) return;
@@ -747,7 +833,6 @@ class QuoteGenerator {
         document.getElementById('localUpdateTime').textContent = 
             new Date(this.lastLocalTimestamp).toLocaleString();
 
-        // Store server quotes for resolution
         this.pendingServerQuotes = serverQuotes;
         
         modal.classList.remove('hidden');
@@ -760,16 +845,18 @@ class QuoteGenerator {
         if (modal) modal.classList.add('hidden');
     }
 
-    // Resolve conflict
+    // Resolve conflict with specified strategy
     resolveConflict(strategy, serverQuotes = this.pendingServerQuotes) {
         if (!serverQuotes) return;
 
         if (strategy === 'server') {
             this.quotes = serverQuotes;
+            this.showNotification('Using server data', 'info');
         } else if (strategy === 'local') {
-            // Keep local data as is
+            this.showNotification('Keeping local data', 'info');
         } else if (strategy === 'merge') {
             this.mergeServerData(serverQuotes);
+            this.showNotification('Data merged successfully', 'info');
         }
 
         this.saveQuotes();
@@ -780,22 +867,21 @@ class QuoteGenerator {
         this.saveSyncMetadata();
         this.hideConflictModal();
         this.updateSyncStatus('online');
-        this.showNotification(`Conflict resolved using ${strategy} data`, 'success');
     }
 
-    // Merge server data
+    // Merge server data with local data
     mergeServerData(serverQuotes) {
         const serverIds = new Set(serverQuotes.map(q => q.id));
         const existingIds = new Set(this.quotes.map(q => q.id));
         
-        // Add new quotes from server
+        // Add new quotes from server that don't exist locally
         serverQuotes.forEach(sq => {
             if (!existingIds.has(sq.id)) {
                 this.quotes.push(sq);
             }
         });
 
-        // Extract categories from server
+        // Extract and add new categories from server
         serverQuotes.forEach(sq => {
             if (!this.categories.includes(sq.category)) {
                 this.categories.push(sq.category);
@@ -809,12 +895,34 @@ class QuoteGenerator {
         this.updateStats();
     }
 
-    // Manual sync
-    manualSync() {
-        this.performSync(true);
+    // Start automatic syncing
+    startAutoSync() {
+        if (this.syncIntervalId) clearInterval(this.syncIntervalId);
+        
+        this.syncIntervalId = setInterval(() => {
+            if (this.autoSync && !this.isSyncing) {
+                this.syncQuotes();
+            }
+        }, this.syncInterval);
+        
+        this.updateSyncStatus('online');
     }
 
-    // Reset sync
+    // Stop automatic syncing
+    stopAutoSync() {
+        if (this.syncIntervalId) {
+            clearInterval(this.syncIntervalId);
+            this.syncIntervalId = null;
+        }
+        this.updateSyncStatus('offline');
+    }
+
+    // Manually trigger sync
+    manualSync() {
+        this.syncQuotes();
+    }
+
+    // Reset sync state
     resetSync() {
         this.conflictsResolved = 0;
         this.retryCount = 0;
@@ -824,7 +932,7 @@ class QuoteGenerator {
         this.showNotification('Sync reset', 'info');
     }
 
-    // Update sync status UI
+    // Update sync status in UI
     updateSyncStatus(status) {
         const statusEl = document.getElementById('syncStatus');
         const textEl = document.getElementById('syncText');
@@ -836,20 +944,20 @@ class QuoteGenerator {
         }
 
         const statusMap = {
-            'online': { text: 'Online', connection: 'Connected' },
-            'offline': { text: 'Offline', connection: 'Disconnected' },
-            'syncing': { text: 'Syncing...', connection: 'Syncing' },
-            'conflict': { text: 'Conflict!', connection: 'Conflict Detected' }
+            'online': { text: 'Online', connection: 'Connected', syncStatus: 'Idle' },
+            'offline': { text: 'Offline', connection: 'Disconnected', syncStatus: 'Failed' },
+            'syncing': { text: 'Syncing...', connection: 'Syncing', syncStatus: 'In Progress' },
+            'conflict': { text: 'Conflict!', connection: 'Conflict Detected', syncStatus: 'Conflict' }
         };
 
         if (textEl && statusMap[status]) textEl.textContent = statusMap[status].text;
         if (connectionEl && statusMap[status]) connectionEl.textContent = statusMap[status].connection;
-        if (syncStatusEl) syncStatusEl.textContent = this.isSyncing ? 'Syncing' : 'Idle';
+        if (syncStatusEl && statusMap[status]) syncStatusEl.textContent = statusMap[status].syncStatus;
 
         this.updateSyncStats();
     }
 
-    // Show notification
+    // Show notification to user
     showNotification(message, type = 'info') {
         const notificationEl = document.getElementById('syncNotifications');
         const messageEl = document.getElementById('notificationMessage');
@@ -874,7 +982,7 @@ class QuoteGenerator {
         }, 4000);
     }
 
-    // Update statistics
+    // Update statistics display
     updateStats() {
         const totalQuotes = document.getElementById('totalQuotes');
         const totalCategories = document.getElementById('totalCategories');
@@ -887,10 +995,83 @@ class QuoteGenerator {
         if (syncHealth) syncHealth.textContent = '100%';
     }
 
-    // Update sync stats
+    // Update sync statistics
     updateSyncStats() {
         const lastSyncEl = document.getElementById('lastSyncTime');
         const conflictsEl = document.getElementById('conflictsResolved');
+        const syncIntervalEl = document.getElementById('syncInterval');
 
         if (lastSyncEl) lastSyncEl.textContent = this.lastSyncTime || 'Never';
-        if (conflictsEl) confl
+        if (conflictsEl) conflictsEl.textContent = this.conflictsResolved;
+        if (syncIntervalEl) syncIntervalEl.textContent = `${this.syncInterval / 1000}s`;
+    }
+}
+
+// ==================== GLOBAL FUNCTIONS FOR COMPATIBILITY ====================
+
+// Add quote quick function
+window.addQuote = function() {
+    if (window.quoteGenerator) {
+        const text = document.getElementById('newQuoteText');
+        const category = document.getElementById('newQuoteCategory');
+        
+        if (text && category && text.value && category.value) {
+            const quote = {
+                id: window.quoteGenerator.generateId(),
+                text: text.value,
+                author: 'Anonymous',
+                category: category.value.toLowerCase(),
+                timestamp: Date.now()
+            };
+            
+            window.quoteGenerator.quotes.push(quote);
+            if (!window.quoteGenerator.categories.includes(quote.category)) {
+                window.quoteGenerator.categories.push(quote.category);
+                window.quoteGenerator.saveCategories();
+                window.quoteGenerator.populateCategories();
+            }
+            
+            window.quoteGenerator.saveQuotes();
+            window.quoteGenerator.updateFilteredQuotes();
+            text.value = '';
+            category.value = '';
+            window.quoteGenerator.displayQuote(quote);
+            window.quoteGenerator.updateStats();
+            window.quoteGenerator.showNotification('Quote added!', 'success');
+        }
+    }
+};
+
+// Filter quotes function
+window.filterQuotes = function() {
+    if (window.quoteGenerator) {
+        window.quoteGenerator.filterQuotes();
+    }
+};
+
+// Export to JSON function
+window.exportToJson = function() {
+    if (window.quoteGenerator) {
+        window.quoteGenerator.exportQuotes();
+    }
+};
+
+// Import from JSON file function
+window.importFromJsonFile = function(event) {
+    if (window.quoteGenerator) {
+        window.quoteGenerator.importFromJsonFile(event);
+    }
+};
+
+// Populate categories function
+window.populateCategories = function() {
+    if (window.quoteGenerator) {
+        window.quoteGenerator.populateCategories();
+    }
+};
+
+// Initialize application when DOM is ready
+document.addEventListener('DOMContentLoaded', () => {
+    window.quoteGenerator = new QuoteGenerator();
+    console.log('Quote Generator initialized with server sync capabilities');
+});
