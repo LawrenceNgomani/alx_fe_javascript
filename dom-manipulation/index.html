@@ -1,39 +1,55 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link rel="stylesheet" href="style.css">
-  <title>Dynamic Quote Generator</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dynamic Quote Generator</title>
+    <link rel="stylesheet" href="styles.css">
 </head>
 <body>
+    <div class="container">
+        <header>
+            <h1>Dynamic Quote Generator</h1>
+            <p class="subtitle">Discover inspirational quotes or add your own</p>
+        </header>
 
-  <h1>Dynamic Quote Generator</h1>
+        <main>
+            <!-- Category Filter Section -->
+            <section class="filter-section">
+                <label for="categoryFilter">Filter by Category:</label>
+                <select id="categoryFilter">
+                    <option value="">All Categories</option>
+                </select>
+            </section>
 
-  <!-- Quote display area -->
-  <div id="quoteDisplay">
-    <p>Select a category and click "Show New Quote"</p>
-  </div>
+            <!-- Quote Display Section -->
+            <section class="quote-section">
+                <div id="quoteDisplay" class="quote-display">
+                    <p id="quoteText" class="quote-text">Click "Show New Quote" to get started!</p>
+                    <p id="quoteCategory" class="quote-category"></p>
+                </div>
+                <button id="showQuoteBtn" class="btn btn-primary">Show New Quote</button>
+            </section>
 
-  <!-- Category selector -->
-  <label for="categorySelect">Choose Category:</label>
-  <select id="categorySelect"></select>
+            <!-- Add Quote Section -->
+            <section class="add-quote-section">
+                <h2>Add Your Own Quote</h2>
+                <button id="toggleFormBtn" class="btn btn-secondary">Add Quote</button>
+                <div id="addQuoteFormContainer"></div>
+            </section>
 
-  <br><br>
+            <!-- Quotes List Section -->
+            <section class="quotes-list-section">
+                <h2>All Quotes</h2>
+                <div id="quotesList" class="quotes-list"></div>
+            </section>
+        </main>
 
-  <!-- Button to show a random quote -->
-  <button id="newQuote">Show New Quote</button>
+        <footer>
+            <p>&copy; 2024 Dynamic Quote Generator. Built with pure JavaScript.</p>
+        </footer>
+    </div>
 
-  <hr>
-
-  <!-- Form to add new quotes -->
-  <h2>Add a New Quote</h2>
-  <div>
-    <input id="newQuoteText" type="text" placeholder="Enter a new quote" />
-    <input id="newQuoteCategory" type="text" placeholder="Enter quote category" />
-    <button id="addQuoteBtn">Add Quote</button>
-  </div>
-
-  <script src="script.js"></script>
+    <script src="script.js"></script>
 </body>
 </html>
