@@ -1,248 +1,55 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Dynamic Quote Generator</title>
-  <link rel="stylesheet" href="style.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dynamic Quote Generator</title>
+    <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <div class="container">
-    <header>
-      <h1>Dynamic Quote Generator</h1>
-      <div class="sync-status">
-        <span id="syncStatus" class="sync-indicator offline">●</span>
-        <span id="syncText">Offline</span>
-        <button id="manualSyncBtn" class="btn btn-mini">Sync Now</button>
-      </div>
-    </header>
-    
-    <main>
-      <div id="quoteDisplay" class="quote-container">
-        <div id="quoteText" class="quote-text">Loading...</div>
-        <div id="quoteAuthor" class="quote-author"></div>
-        <div id="quoteCategory" class="quote-category"></div>
-      </div>
-      
-      <div class="controls">
-        <button id="newQuote" class="btn btn-primary">Show New Quote</button>
-        <button id="addQuoteBtn" class="btn btn-secondary">Add New Quote</button>
-      </div>
-      
-      <!-- Category Filter Section -->
-      <div class="category-filter-section">
-        <label for="categoryFilter">Quick Filter:</label>
-        <select id="categoryFilter">
-          <option value="all">All Categories</option>
-        </select>
-      </div>
-      
-      <!-- Add Quote Form -->
-      <div id="addQuoteForm" class="form-container hidden">
-        <h3>Add New Quote</h3>
-        <form id="quoteForm">
-          <div class="form-group">
-            <label for="formQuoteText">Quote Text:</label>
-            <textarea id="formQuoteText" name="quoteText" placeholder="Enter the quote text..." required></textarea>
-          </div>
-          <div class="form-group">
-            <label for="formQuoteAuthor">Author:</label>
-            <input type="text" id="formQuoteAuthor" name="quoteAuthor" placeholder="Enter author name..." required>
-          </div>
-          <div class="form-group">
-            <label for="addQuoteCategory">Category:</label>
-            <select id="addQuoteCategory" name="quoteCategory" required>
-              <option value="">Select a category...</option>
-            </select>
-          </div>
-          <div class="form-actions">
-            <button type="submit" class="btn btn-primary">Add Quote</button>
-            <button type="button" id="cancelAddQuote" class="btn btn-secondary">Cancel</button>
-          </div>
-        </form>
-      </div>
-      
-      <!-- Quick Add Quote Form -->
-      <div class="simple-form-container">
-        <h3>Quick Add Quote</h3>
-        <div>
-          <input id="newQuoteText" type="text" placeholder="Enter a new quote" />
-          <input id="newQuoteCategory" type="text" placeholder="Enter quote category" />
-          <button onclick="addQuote()">Add Quote</button>
-        </div>
-      </div>
-      
-      <!-- Data Management Section -->
-      <div class="json-management-section">
-        <h3>Data Management</h3>
-        <div class="json-controls">
-          <label for="importFile" class="file-label">Import Quotes (JSON)</label>
-          <input type="file" id="importFile" accept=".json" />
-          <button id="exportBtn" class="btn btn-success">Export Quotes (JSON)</button>
-          <button id="clearStorageBtn" class="btn btn-danger">Clear All Data</button>
-        </div>
-      </div>
-      
-      <!-- Sync Notification Area -->
-      <div id="syncNotifications" class="sync-notifications hidden">
-        <div class="notification-content">
-          <span id="notificationIcon" class="notification-icon">ℹ️</span>
-          <span id="notificationMessage" class="notification-message"></span>
-          <button id="closeNotification" class="notification-close">&times;</button>
-        </div>
-      </div>
-      
-      <!-- Conflict Resolution Modal -->
-      <div id="conflictModal" class="modal hidden">
-        <div class="modal-content">
-          <div class="modal-header">
-            <h3>Data Conflict Detected</h3>
-            <button id="closeConflictModal" class="close-btn">&times;</button>
-          </div>
-          <div class="modal-body">
-            <p>Server data differs from your local data. How would you like to resolve this conflict?</p>
-            <div class="conflict-summary">
-              <div class="conflict-item">
-                <span class="conflict-label">Server Quotes:</span>
-                <span id="serverQuotesCount">0</span>
-              </div>
-              <div class="conflict-item">
-                <span class="conflict-label">Local Quotes:</span>
-                <span id="localQuotesCount">0</span>
-              </div>
-              <div class="conflict-item">
-                <span class="conflict-label">Last Server Update:</span>
-                <span id="serverUpdateTime">Unknown</span>
-              </div>
-              <div class="conflict-item">
-                <span class="conflict-label">Last Local Update:</span>
-                <span id="localUpdateTime">Unknown</span>
-              </div>
-            </div>
-            <div class="conflict-options">
-              <button id="useServerData" class="btn btn-primary">Use Server Data</button>
-              <button id="useLocalData" class="btn btn-secondary">Keep Local Data</button>
-              <button id="mergeData" class="btn btn-success">Merge Both</button>
-            </div>
-            <div id="conflictDetails" class="conflict-details hidden">
-              <h4>Conflict Details:</h4>
-              <div id="conflictDetailsList"></div>
-            </div>
-            <div class="conflict-actions">
-              <button id="showConflictDetails" class="btn btn-mini">Show Details</button>
-              <button id="hideConflictDetails" class="btn btn-mini hidden">Hide Details</button>
-            </div>
-          </div>
-        </div>
-      </div>
-      
-      <!-- Server Status Panel -->
-      <div class="server-status-panel">
-        <h4>Server Sync Status</h4>
-        <div class="status-grid">
-          <div class="status-item">
-            <span class="status-label">Connection:</span>
-            <span id="connectionStatus" class="status-value">Disconnected</span>
-          </div>
-          <div class="status-item">
-            <span class="status-label">Last Sync:</span>
-            <span id="lastSyncTime" class="status-value">Never</span>
-          </div>
-          <div class="status-item">
-            <span class="status-label">Sync Interval:</span>
-            <span id="syncInterval" class="status-value">30s</span>
-          </div>
-          <div class="status-item">
-            <span class="status-label">Conflicts Resolved:</span>
-            <span id="conflictsResolved" class="status-value">0</span>
-          </div>
-          <div class="status-item">
-            <span class="status-label">Data Version:</span>
-            <span id="dataVersion" class="status-value">v1.0</span>
-          </div>
-          <div class="status-item">
-            <span class="status-label">Sync Status:</span>
-            <span id="syncStatusText" class="status-value">Idle</span>
-          </div>
-        </div>
-        <div class="sync-controls">
-          <div class="sync-control-group">
-            <label for="autoSyncToggle">Auto Sync:</label>
-            <input type="checkbox" id="autoSyncToggle" checked>
-          </div>
-          <div class="sync-control-group">
-            <label for="syncIntervalSelect">Interval:</label>
-            <select id="syncIntervalSelect">
-              <option value="15000">15 seconds</option>
-              <option value="30000" selected>30 seconds</option>
-              <option value="60000">1 minute</option>
-              <option value="300000">5 minutes</option>
-            </select>
-          </div>
-          <div class="sync-control-group">
-            <button id="forceSyncBtn" class="btn btn-primary">Force Sync</button>
-            <button id="resetSyncBtn" class="btn btn-danger">Reset Sync</button>
-          </div>
-        </div>
-      </div>
-      
-      <!-- Advanced Sync Options -->
-      <div class="advanced-sync-options">
-        <h4>Advanced Sync Options</h4>
-        <div class="advanced-options-grid">
-          <div class="option-item">
-            <label for="conflictResolutionMode">Default Conflict Resolution:</label>
-            <select id="conflictResolutionMode">
-              <option value="ask">Ask User</option>
-              <option value="server">Prefer Server</option>
-              <option value="local">Prefer Local</option>
-              <option value="merge">Always Merge</option>
-            </select>
-          </div>
-          <div class="option-item">
-            <label for="syncOnlyOnChanges">Sync Only On Changes:</label>
-            <input type="checkbox" id="syncOnlyOnChanges" checked>
-          </div>
-          <div class="option-item">
-            <label for="retryFailedSync">Retry Failed Syncs:</label>
-            <input type="checkbox" id="retryFailedSync" checked>
-          </div>
-          <div class="option-item">
-            <label for="maxRetryAttempts">Max Retry Attempts:</label>
-            <select id="maxRetryAttempts">
-              <option value="1">1</option>
-              <option value="3" selected>3</option>
-              <option value="5">5</option>
-              <option value="10">10</option>
-            </select>
-          </div>
-        </div>
-      </div>
-      
-      <!-- Statistics Display -->
-      <div class="stats">
-        <div id="quoteStats" class="stats-display">
-          <div class="stat-item">
-            <span class="stat-label">Total Quotes:</span>
-            <span id="totalQuotes" class="stat-number">0</span>
-          </div>
-          <div class="stat-item">
-            <span class="stat-label">Categories:</span>
-            <span id="totalCategories" class="stat-number">0</span>
-          </div>
-          <div class="stat-item">
-            <span class="stat-label">Displayed:</span>
-            <span id="displayedQuotes" class="stat-number">0</span>
-          </div>
-          <div class="stat-item">
-            <span class="stat-label">Sync Health:</span>
-            <span id="syncHealth" class="stat-number">100%</span>
-          </div>
-        </div>
-      </div>
-    </main>
-  </div>
-  
-  <script src="script.js"></script>
+    <div class="container">
+        <header>
+            <h1>Dynamic Quote Generator</h1>
+            <p class="subtitle">Discover inspirational quotes or add your own</p>
+        </header>
+
+        <main>
+            <!-- Category Filter Section -->
+            <section class="filter-section">
+                <label for="categoryFilter">Filter by Category:</label>
+                <select id="categoryFilter">
+                    <option value="">All Categories</option>
+                </select>
+            </section>
+
+            <!-- Quote Display Section -->
+            <section class="quote-section">
+                <div id="quoteDisplay" class="quote-display">
+                    <p id="quoteText" class="quote-text">Click "Show New Quote" to get started!</p>
+                    <p id="quoteCategory" class="quote-category"></p>
+                </div>
+                <button id="showQuoteBtn" class="btn btn-primary">Show New Quote</button>
+            </section>
+
+            <!-- Add Quote Section -->
+            <section class="add-quote-section">
+                <h2>Add Your Own Quote</h2>
+                <button id="toggleFormBtn" class="btn btn-secondary">Add Quote</button>
+                <div id="addQuoteFormContainer"></div>
+            </section>
+
+            <!-- Quotes List Section -->
+            <section class="quotes-list-section">
+                <h2>All Quotes</h2>
+                <div id="quotesList" class="quotes-list"></div>
+            </section>
+        </main>
+
+        <footer>
+            <p>&copy; 2024 Dynamic Quote Generator. Built with pure JavaScript.</p>
+        </footer>
+    </div>
+
+    <script src="script.js"></script>
 </body>
 </html>
