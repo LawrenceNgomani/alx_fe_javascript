@@ -14,8 +14,44 @@
         </header>
 
         <main>
-            <!-- Storage Controls Section -->
-            <section class="storage-section">
+            <!-- Sync Status Section -->
+            <section class="sync-section">
+                <div class="sync-header">
+                    <h3>Cloud Sync Status</h3>
+                    <div class="sync-controls">
+                        <button id="syncNowBtn" class="btn btn-success" title="Manually sync with server">
+                            ☁ Sync Now
+                        </button>
+                        <button id="conflictHistoryBtn" class="btn btn-info" title="View conflict history">
+                            ⚠ Conflict History
+                        </button>
+                        <button id="toggleAutoSyncBtn" class="btn btn-secondary" title="Toggle automatic syncing">
+                            🔄 Auto Sync: ON
+                        </button>
+                    </div>
+                </div>
+                
+                <div id="syncStatus" class="sync-status">
+                    <div class="status-indicator pending"></div>
+                    <span id="syncStatusText">Initializing sync...</span>
+                </div>
+            </section>
+
+            <!-- Conflict Resolution Modal -->
+            <div id="conflictModal" class="modal" style="display: none;">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3>Conflict Resolution</h3>
+                        <button id="closeConflictModal" class="modal-close">&times;</button>
+                    </div>
+                    <div id="conflictsList" class="conflicts-list"></div>
+                    <div class="modal-footer">
+                        <button id="keepLocalBtn" class="btn btn-secondary">Keep Local</button>
+                        <button id="useServerBtn" class="btn btn-primary">Use Server</button>
+                        <button id="mergeDataBtn" class="btn btn-success">Merge Both</button>
+                    </div>
+                </div>
+            </div>
                 <div class="storage-controls">
                     <h3>Data Management</h3>
                     <div class="control-buttons">

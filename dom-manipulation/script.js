@@ -1,9 +1,15 @@
-// Quote Generator Application with Advanced Filtering
+// Quote Generator Application with Server Sync
 class QuoteGenerator {
     constructor() {
         this.STORAGE_KEY = "quoteGeneratorQuotes";
         this.FILTER_KEY = "lastSelectedFilter";
         this.SESSION_KEY = "lastViewedQuote";
+        this.SYNC_TIMESTAMP_KEY = "lastSyncTimestamp";
+        this.CONFLICT_HISTORY_KEY = "conflictHistory";
+        this.SERVER_DATA_KEY = "serverQuoteData";
+        this.AUTO_SYNC_KEY = "autoSyncEnabled";
+        this.MOCK_SERVER_URL = "https://jsonplaceholder.typicode.com/posts";
+        this.SYNC_INTERVAL = 30000; // 30 seconds for demo
         this.DEFAULT_QUOTES = [
             { text: "The only way to do great work is to love what you do.", category: "Inspiration" },
             { text: "Innovation distinguishes between a leader and a follower.", category: "Leadership" },
