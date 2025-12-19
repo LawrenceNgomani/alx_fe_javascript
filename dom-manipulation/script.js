@@ -26,6 +26,9 @@ class QuoteGenerator {
         this.filteredQuotes = [];
         this.currentQuote = null;
         this.selectedCategory = "";
+        this.autoSyncEnabled = true;
+        this.syncing = false;
+        this.pendingConflicts = [];
         
         this.initializeDOM();
         this.loadFromStorage();
@@ -34,6 +37,7 @@ class QuoteGenerator {
         this.restoreLastFilter();
         this.renderQuotesList();
         this.restoreLastViewedQuote();
+        this.initializeSync();
     }
 
     // Initialize all DOM references
@@ -55,7 +59,18 @@ class QuoteGenerator {
             importFile: document.getElementById("importFile"),
             clearStorageBtn: document.getElementById("clearStorageBtn"),
             viewStorageBtn: document.getElementById("viewStorageBtn"),
-            storageInfo: document.getElementById("storageInfo")
+            storageInfo: document.getElementById("storageInfo"),
+            syncNowBtn: document.getElementById("syncNowBtn"),
+            syncStatus: document.getElementById("syncStatus"),
+            syncStatusText: document.getElementById("syncStatusText"),
+            toggleAutoSyncBtn: document.getElementById("toggleAutoSyncBtn"),
+            conflictHistoryBtn: document.getElementById("conflictHistoryBtn"),
+            conflictModal: document.getElementById("conflictModal"),
+            closeConflictModal: document.getElementById("closeConflictModal"),
+            conflictsList: document.getElementById("conflictsList"),
+            keepLocalBtn: document.getElementById("keepLocalBtn"),
+            useServerBtn: document.getElementById("useServerBtn"),
+            mergeDataBtn: document.getElementById("mergeDataBtn")
         };
     }
 
@@ -144,6 +159,13 @@ class QuoteGenerator {
         this.elements.importFile.addEventListener("change", (e) => this.importFromJSON(e));
         this.elements.clearStorageBtn.addEventListener("click", () => this.clearStorage());
         this.elements.viewStorageBtn.addEventListener("click", () => this.viewStorageInfo());
+        this.elements.syncNowBtn.addEventListener("click", () => this.syncNow());
+        this.elements.toggleAutoSyncBtn.addEventListener("click", () => this.toggleAutoSync());
+        this.elements.conflictHistoryBtn.addEventListener("click", () => this.showConflictHistory());
+        this.elements.closeConflictModal.addEventListener("click", () => this.closeConflictModal());
+        this.elements.keepLocalBtn.addEventListener("click", () => this.resolveConflict("local"));
+        this.elements.useServerBtn.addEventListener("click", () => this.resolveConflict("server"));
+        this.elements.mergeDataBtn.addEventListener("click", () => this.resolveConflict("merge"));
     }
 
     // Get all unique categories from quotes
@@ -638,6 +660,281 @@ class QuoteGenerator {
             notification.style.animation = "slideUp 0.3s ease";
             setTimeout(() => notification.remove(), 300);
         }, 3000);
+    }
+
+    // Initialize sync system
+    initializeSync() {
+        const autoSync = localStorage.getItem(this.AUTO_SYNC_KEY);
+        this.autoSyncEnabled = autoSync !== "false";
+        this.updateAutoSyncButton();
+        this.updateSyncStatus("synced");
+        
+        if (this.autoSyncEnabled) {
+            this.startAutoSync();
+        }
+    }
+
+    // Start automatic sync
+    startAutoSync() {
+        this.syncInterval = setInterval(() => {
+            if (this.autoSyncEnabled && !this.syncing) {
+                this.syncNow();
+            }
+        }, this.SYNC_INTERVAL);
+    }
+
+    // Stop automatic sync
+    stopAutoSync() {
+        if (this.syncInterval) {
+            clearInterval(this.syncInterval);
+            this.syncInterval = null;
+        }
+    }
+
+    // Toggle auto sync
+    toggleAutoSync() {
+        this.autoSyncEnabled = !this.autoSyncEnabled;
+        localStorage.setItem(this.AUTO_SYNC_KEY, this.autoSyncEnabled);
+        this.updateAutoSyncButton();
+
+        if (this.autoSyncEnabled) {
+            this.startAutoSync();
+            this.showNotification("Auto sync enabled");
+        } else {
+            this.stopAutoSync();
+            this.showNotification("Auto sync disabled");
+        }
+    }
+
+    // Update auto sync button
+    updateAutoSyncButton() {
+        const status = this.autoSyncEnabled ? "ON" : "OFF";
+        this.elements.toggleAutoSyncBtn.textContent = `🔄 Auto Sync: ${status}`;
+        this.elements.toggleAutoSyncBtn.style.opacity = this.autoSyncEnabled ? "1" : "0.6";
+    }
+
+    // Update sync status display
+    updateSyncStatus(status) {
+        const indicator = this.elements.syncStatus.querySelector(".status-indicator");
+        const text = this.elements.syncStatusText;
+        
+        indicator.className = "status-indicator " + status;
+        
+        switch(status) {
+            case "syncing":
+                text.textContent = "Syncing with server...";
+                break;
+            case "synced":
+                text.textContent = `Last synced: ${new Date().toLocaleTimeString()}`;
+                break;
+            case "error":
+                text.textContent = "Sync failed - offline or server error";
+                break;
+            case "conflict":
+                text.textContent = "Conflicts detected - review and resolve";
+                break;
+        }
+    }
+
+    // Sync now
+    async syncNow() {
+        if (this.syncing) return;
+        
+        this.syncing = true;
+        this.updateSyncStatus("syncing");
+
+        try {
+            // Simulate fetching server data
+            const serverData = await this.fetchQuotesFromServer();
+            
+            // Check for conflicts
+            const conflicts = this.detectConflicts(serverData);
+            
+            if (conflicts.length > 0) {
+                this.pendingConflicts = conflicts;
+                this.updateSyncStatus("conflict");
+                this.showNotification("⚠ Conflicts detected - please review", "error");
+            } else {
+                // Merge data
+                this.mergeQuotes(serverData);
+                this.saveToStorage();
+                this.populateCategories();
+                this.filterQuotes();
+                this.updateSyncStatus("synced");
+                this.showNotification("✓ Sync completed successfully");
+            }
+            
+            this.updateLastSyncTimestamp();
+        } catch (error) {
+            console.error("Sync error:", error);
+            this.updateSyncStatus("error");
+            this.showNotification("Sync failed - check your connection", "error");
+        } finally {
+            this.syncing = false;
+        }
+    }
+
+    // Fetch server data (simulated)
+    async fetchQuotesFromServer() {
+        try {
+            const response = await fetch(this.MOCK_SERVER_URL + "?_limit=3");
+            const posts = await response.json();
+            
+            // Convert posts to quote format for simulation
+            const serverQuotes = posts.map(post => ({
+                text: post.title,
+                category: "Server",
+                id: post.id,
+                timestamp: Date.now()
+            }));
+            
+            localStorage.setItem(this.SERVER_DATA_KEY, JSON.stringify(serverQuotes));
+            return serverQuotes;
+        } catch (error) {
+            console.error("Failed to fetch from server:", error);
+            // Return cached server data if offline
+            const cached = localStorage.getItem(this.SERVER_DATA_KEY);
+            return cached ? JSON.parse(cached) : [];
+        }
+    }
+
+    // Detect conflicts between local and server data
+    detectConflicts(serverData) {
+        const conflicts = [];
+        
+        // Check if server has quotes we don't have
+        serverData.forEach(serverQuote => {
+            const localExists = this.quotes.some(q => 
+                q.text === serverQuote.text && q.category === serverQuote.category
+            );
+            
+            if (!localExists && serverData.length > 0) {
+                conflicts.push({
+                    type: "new_server_quote",
+                    local: null,
+                    server: serverQuote,
+                    timestamp: Date.now()
+                });
+            }
+        });
+        
+        return conflicts;
+    }
+
+    // Merge quotes from server
+    mergeQuotes(serverData) {
+        serverData.forEach(serverQuote => {
+            const exists = this.quotes.some(q => 
+                q.text === serverQuote.text && q.category === serverQuote.category
+            );
+            
+            if (!exists) {
+                this.quotes.push({
+                    text: serverQuote.text,
+                    category: serverQuote.category
+                });
+            }
+        });
+    }
+
+    // Show conflict history modal
+    showConflictHistory() {
+        if (this.pendingConflicts.length === 0) {
+            this.showNotification("No pending conflicts", "error");
+            return;
+        }
+
+        this.elements.conflictsList.innerHTML = "";
+        
+        this.pendingConflicts.forEach((conflict, index) => {
+            const item = document.createElement("div");
+            item.className = "conflict-item";
+            
+            let content = `<div class="conflict-title">Conflict #${index + 1}: ${conflict.type}</div>`;
+            content += `<div class="conflict-compare">`;
+            
+            if (conflict.local) {
+                content += `
+                    <div class="conflict-version conflict-local">
+                        <div class="conflict-label">Local Version</div>
+                        <div class="conflict-text">"${conflict.local.text}"<br/><em>${conflict.local.category}</em></div>
+                    </div>
+                `;
+            } else {
+                content += `<div class="conflict-version conflict-local"><em>No local version</em></div>`;
+            }
+            
+            if (conflict.server) {
+                content += `
+                    <div class="conflict-version conflict-server">
+                        <div class="conflict-label">Server Version</div>
+                        <div class="conflict-text">"${conflict.server.text}"<br/><em>${conflict.server.category}</em></div>
+                    </div>
+                `;
+            } else {
+                content += `<div class="conflict-version conflict-server"><em>Server removed</em></div>`;
+            }
+            
+            content += `</div>`;
+            item.innerHTML = content;
+            this.elements.conflictsList.appendChild(item);
+        });
+
+        this.elements.conflictModal.style.display = "flex";
+    }
+
+    // Close conflict modal
+    closeConflictModal() {
+        this.elements.conflictModal.style.display = "none";
+    }
+
+    // Resolve conflicts
+    resolveConflict(strategy) {
+        if (this.pendingConflicts.length === 0) {
+            this.closeConflictModal();
+            return;
+        }
+
+        this.pendingConflicts.forEach(conflict => {
+            if (strategy === "server" && conflict.server) {
+                // Keep only server version
+                if (conflict.local) {
+                    const idx = this.quotes.findIndex(q => 
+                        q.text === conflict.local.text
+                    );
+                    if (idx !== -1) this.quotes.splice(idx, 1);
+                }
+                this.quotes.push({
+                    text: conflict.server.text,
+                    category: conflict.server.category
+                });
+            } else if (strategy === "local" && conflict.local) {
+                // Keep local version, do nothing
+            } else if (strategy === "merge") {
+                // Keep both versions
+                if (conflict.server && !this.quotes.find(q => 
+                    q.text === conflict.server.text && q.category === conflict.server.category
+                )) {
+                    this.quotes.push({
+                        text: conflict.server.text,
+                        category: conflict.server.category
+                    });
+                }
+            }
+        });
+
+        this.pendingConflicts = [];
+        this.saveToStorage();
+        this.populateCategories();
+        this.filterQuotes();
+        this.updateSyncStatus("synced");
+        this.closeConflictModal();
+        this.showNotification("✓ Conflicts resolved");
+    }
+
+    // Update last sync timestamp
+    updateLastSyncTimestamp() {
+        localStorage.setItem(this.SYNC_TIMESTAMP_KEY, new Date().toISOString());
     }
 }
 
