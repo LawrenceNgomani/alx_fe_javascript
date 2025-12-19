@@ -33,6 +33,7 @@ class QuoteGenerator {
     // Initialize all DOM references
     initializeDOM() {
         this.elements = {
+            quoteDisplay: document.getElementById("quoteDisplay"),
             quoteText: document.getElementById("quoteText"),
             quoteCategory: document.getElementById("quoteCategory"),
             showQuoteBtn: document.getElementById("showQuoteBtn"),
@@ -271,9 +272,9 @@ class QuoteGenerator {
         this.elements.quoteText.textContent = `"${quote.text}"`;
         this.elements.quoteCategory.textContent = `Category: ${quote.category}`;
         
-        this.elements.quoteText.parentElement.style.animation = "none";
+        this.elements.quoteDisplay.style.animation = "none";
         setTimeout(() => {
-            this.elements.quoteText.parentElement.style.animation = "slideDown 0.3s ease";
+            this.elements.quoteDisplay.style.animation = "slideDown 0.3s ease";
         }, 10);
     }
 
