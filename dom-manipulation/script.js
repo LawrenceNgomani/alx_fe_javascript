@@ -753,15 +753,22 @@ class QuoteGenerator {
             if (conflicts.length > 0) {
                 this.pendingConflicts = conflicts;
                 this.updateSyncStatus("conflict");
-                this.showNotification("⚠ Conflicts detected - please review", "error");
-            } else {
-                // Merge data
+                this.showNotification("⚠ Conflicts detected - server data has new quotes", "error");
+                // Server data takes precedence - automatically merge
                 this.mergeQuotes(serverData);
                 this.saveToStorage();
                 this.populateCategories();
                 this.filterQuotes();
                 this.updateSyncStatus("synced");
-                this.showNotification("✓ Sync completed successfully");
+                this.showNotification("✓ Sync completed - server data merged with local storage");
+            } else {
+                // No conflicts - direct merge
+                this.mergeQuotes(serverData);
+                this.saveToStorage();
+                this.populateCategories();
+                this.filterQuotes();
+                this.updateSyncStatus("synced");
+                this.showNotification("✓ Sync completed successfully - data is up to date");
             }
             
             this.updateLastSyncTimestamp();
@@ -808,7 +815,8 @@ class QuoteGenerator {
                 q.text === serverQuote.text && q.category === serverQuote.category
             );
             
-            if (!localExists && serverData.length > 0) {
+            // Only flag as conflict if server has new data
+            if (!localExists) {
                 conflicts.push({
                     type: "new_server_quote",
                     local: null,
