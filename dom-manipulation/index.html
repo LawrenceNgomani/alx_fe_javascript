@@ -46,10 +46,28 @@
 
             <!-- Category Filter Section -->
             <section class="filter-section">
-                <label for="categoryFilter">Filter by Category:</label>
-                <select id="categoryFilter">
-                    <option value="">All Categories</option>
-                </select>
+                <div class="filter-header">
+                    <h3>Filter Quotes by Category</h3>
+                    <button id="resetFilterBtn" class="btn btn-sm btn-secondary" title="Reset to all categories">
+                        Reset Filter
+                    </button>
+                </div>
+                
+                <div class="filter-controls">
+                    <div class="filter-dropdown-wrapper">
+                        <label for="categoryFilter">Select Category:</label>
+                        <select id="categoryFilter">
+                            <option value="">All Categories</option>
+                        </select>
+                    </div>
+                    
+                    <div class="filter-buttons-wrapper">
+                        <label>Quick Filter:</label>
+                        <div id="categoryButtons" class="category-buttons"></div>
+                    </div>
+                </div>
+                
+                <div id="filterStats" class="filter-stats"></div>
             </section>
 
             <!-- Quote Display Section -->
